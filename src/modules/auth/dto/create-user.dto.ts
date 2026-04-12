@@ -1,31 +1,52 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsString,
+  MinLength,
+} from 'class-validator';
+import { UserKind } from 'prisma/generated/enums';
 
 export class CreateUserDto {
+  @ApiProperty({
+    description: 'User name',
+    example: 'John Doe',
+  })
+  @IsString()
   @IsNotEmpty()
-  @ApiProperty()
-  name?: string;
+  name: string;
 
+  @ApiProperty({
+    description: 'User email',
+    example: 'john.doe@example.com',
+  })
   @IsNotEmpty()
-  @ApiProperty()
-  first_name?: string;
+  @IsEmail()
+  email: string;
 
+  @ApiProperty({
+    description: 'User phone number',
+    example: '+91 9876543210',
+  })
   @IsNotEmpty()
-  @ApiProperty()
-  last_name?: string;
+  @IsString()
+  phone_number: string;
 
+  @ApiProperty({
+    description: 'User password',
+    example: 'password',
+  })
   @IsNotEmpty()
-  @ApiProperty()
-  email?: string;
-
-  @IsNotEmpty()
+  @IsString()
   @MinLength(8, { message: 'Password should be minimum 8' })
-  @ApiProperty()
   password: string;
 
   @ApiProperty({
-    type: String,
-    example: 'user',
+    description: 'User kind',
+    example: UserKind.USER,
   })
-  type?: string;
+  @IsNotEmpty()
+  @IsEnum(UserKind, { message: 'Invalid user kind' })
+  kind: UserKind;
 }

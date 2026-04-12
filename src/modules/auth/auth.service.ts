@@ -1,5 +1,5 @@
 // external imports
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
@@ -15,6 +15,7 @@ import { SojebStorage } from '../../common/lib/Disk/SojebStorage';
 import { DateHelper } from '../../common/helper/date.helper';
 import { StripePayment } from '../../common/lib/Payment/stripe/StripePayment';
 import { StringHelper } from '../../common/helper/string.helper';
+import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
 export class AuthService {
@@ -327,114 +328,89 @@ export class AuthService {
     }
   }
 
-  async register({
-    name,
-    first_name,
-    last_name,
-    email,
-    password,
-    type,
-  }: {
-    name: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    password: string;
-    type?: string;
-  }) {
-    try {
-      // Check if email already exist
-      const userEmailExist = await this.userRepository.exist({
-        field: 'email',
-        value: String(email),
-      });
+  async register(createUserDto: CreateUserDto) {
+    const { name, email, password, kind } = createUserDto;
+    // Check if email already exist
+    const userEmailExist = await this.userRepository.exist({
+      field: 'email',
+      value: String(email),
+    });
 
-      if (userEmailExist) {
-        return {
-          statusCode: 401,
-          message: 'Email already exist',
-        };
-      }
+    if (userEmailExist) {
+      throw new BadRequestException('Email already exist');
+    }
 
-      const user = await this.userRepository.createUser({
-        name: name,
-        first_name: first_name,
-        last_name: last_name,
-        email: email,
-        password: password,
-        type: type,
-      });
+    const user = await this.userRepository.createUser({
+      name: name,
+      email: email,
+      password: password,
+      kind: kind,
+    });
 
-      if (user == null && user.success == false) {
-        return {
-          success: false,
-          message: 'Failed to create account',
-        };
-      }
-
-      // create stripe customer account
-      const stripeCustomer = await StripePayment.createCustomer({
-        user_id: user.data.id,
-        email: email,
-        name: name,
-      });
-
-      if (stripeCustomer) {
-        await this.prisma.user.update({
-          where: {
-            id: user.data.id,
-          },
-          data: {
-            billing_id: stripeCustomer.id,
-          },
-        });
-      }
-
-      // ----------------------------------------------------
-      // // create otp code
-      // const token = await this.ucodeRepository.createToken({
-      //   userId: user.data.id,
-      //   isOtp: true,
-      // });
-
-      // // send otp code to email
-      // await this.mailService.sendOtpCodeToEmail({
-      //   email: email,
-      //   name: name,
-      //   otp: token,
-      // });
-
-      // return {
-      //   success: true,
-      //   message: 'We have sent an OTP code to your email',
-      // };
-
-      // ----------------------------------------------------
-
-      // Generate verification token
-      const token = await this.ucodeRepository.createVerificationToken({
-        userId: user.data.id,
-        email: email,
-      });
-
-      // Send verification email with token
-      await this.mailService.sendVerificationLink({
-        email,
-        name: email,
-        token: token.token,
-        type: type,
-      });
-
-      return {
-        success: true,
-        message: 'We have sent a verification link to your email',
-      };
-    } catch (error) {
+    if (user == null && user.success == false) {
       return {
         success: false,
-        message: error.message,
+        message: 'Failed to create account',
       };
     }
+
+    // create stripe customer account
+    const stripeCustomer = await StripePayment.createCustomer({
+      user_id: user.data.id,
+      email: email,
+      name: name,
+    });
+
+    if (stripeCustomer) {
+      await this.prisma.user.update({
+        where: {
+          id: user.data.id,
+        },
+        data: {
+          billing_id: stripeCustomer.id,
+        },
+      });
+    }
+
+    // ----------------------------------------------------
+    // // create otp code
+    // const token = await this.ucodeRepository.createToken({
+    //   userId: user.data.id,
+    //   isOtp: true,
+    // });
+
+    // // send otp code to email
+    // await this.mailService.sendOtpCodeToEmail({
+    //   email: email,
+    //   name: name,
+    //   otp: token,
+    // });
+
+    // return {
+    //   success: true,
+    //   message: 'We have sent an OTP code to your email',
+    // };
+
+    // ----------------------------------------------------
+
+    // Generate verification token
+    const token = await this.ucodeRepository.createVerificationToken({
+      userId: user.data.id,
+      email: email,
+    });
+
+    // Send verification email with token
+    await this.mailService.sendVerificationLink({
+      email,
+      name: email,
+      token: token.token,
+      type: type,
+    });
+
+    return {
+      success: true,
+      message: 'We have sent a verification link to your email',
+    };
   }
 
   async forgotPassword(email) {
@@ -739,84 +715,4 @@ export class AuthService {
       };
     }
   }
-
-  // --------- 2FA ---------
-  async generate2FASecret(user_id: string) {
-    try {
-      return await this.userRepository.generate2FASecret(user_id);
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
-  async verify2FA(user_id: string, token: string) {
-    try {
-      const isValid = await this.userRepository.verify2FA(user_id, token);
-      if (!isValid) {
-        return {
-          success: false,
-          message: 'Invalid token',
-        };
-      }
-      return {
-        success: true,
-        message: '2FA verified successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
-  async enable2FA(user_id: string) {
-    try {
-      const user = await this.userRepository.getUserDetails(user_id);
-      if (user) {
-        await this.userRepository.enable2FA(user_id);
-        return {
-          success: true,
-          message: '2FA enabled successfully',
-        };
-      } else {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
-  async disable2FA(user_id: string) {
-    try {
-      const user = await this.userRepository.getUserDetails(user_id);
-      if (user) {
-        await this.userRepository.disable2FA(user_id);
-        return {
-          success: true,
-          message: '2FA disabled successfully',
-        };
-      } else {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-  // --------- end 2FA ---------
 }
