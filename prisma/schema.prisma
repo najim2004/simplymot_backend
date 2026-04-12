@@ -1,0 +1,912 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- Domain enums (typed statuses & kinds) ---
+
+enum UserKind {
+  USER
+  DRIVER
+  GARAGE
+  ADMIN
+}
+
+enum UserAccountStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum UcodeStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  REVOKED
+}
+
+enum RoleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PermissionStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum NotificationEventStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+enum SubscriptionPlanStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+/// Aligns with common billing providers (e.g. Stripe subscription states).
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  UNPAID
+  PAUSED
+  INACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentTransactionKind {
+  SUBSCRIPTION
+  ORDER
+  ADJUSTMENT
+  OTHER
+}
+
+enum PaymentTransactionStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+model Account {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user_id String
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  type                String?
+  provider            String?
+  provider_account_id String?
+  refresh_token       String?
+  access_token        String?
+  expires_at          DateTime?
+  token_type          String?
+  scope               String?
+  id_token            String?
+  session_state       String?
+
+  @@unique([provider, provider_account_id])
+  @@index([user_id])
+  @@map("accounts")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  deleted_at        DateTime?
+  approved_at       DateTime?
+  email_verified_at DateTime?
+
+  status UserAccountStatus @default(PENDING)
+
+  email    String? @unique
+  username String? @unique
+  name     String? @db.VarChar(255)
+  password String? @db.VarChar(255)
+  avatar   String?
+
+  phone_number String?
+
+  country  String?
+  state    String?
+  city     String?
+  address  String?
+  zip_code String?
+
+  // billing id. e.g. stripe customer id
+  billing_id String?
+
+  /// Discriminator: end-user vs garage operator vs admin (DB column: type).
+  kind UserKind @default(USER) @map("type")
+
+  accounts Account[]
+
+  receiver_notifications Notification[]       @relation("receiver")
+  sender_notifications   Notification[]       @relation("sender")
+  user_settings          UserSetting[]
+  ucodes                 Ucode[]
+  roles                  Role[]
+  role_users             RoleUser[]
+  payment_transactions   PaymentTransaction[]
+  garages                Garage[]
+  subscriptions          Subscription[]
+  vehicles               Vehicle[]
+  timeSlots              TimeSlot[]
+  bookings               Booking[]
+
+  @@index([deleted_at])
+  @@index([status])
+  @@index([kind])
+  @@index([billing_id])
+  @@map("users")
+}
+
+model Garage {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  owner_id    String
+  avatar      String?
+  garage_name String? @db.VarChar(255)
+
+  contact_email String? @unique
+  phone_number  String?
+  vts_number    String?
+
+  // garage address
+  country   String?
+  state     String?
+  city      String?
+  address   String?
+  zip_code  String?
+  latitude  Float?
+  longitude Float?
+
+  owner     User       @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  services  Service[]
+  schedule  Schedule?
+  timeSlots TimeSlot[]
+  bookings  Booking[]
+
+  @@index([owner_id])
+  @@map("garages")
+}
+
+enum DayOfWeek {
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+model Schedule {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  garage_id String @unique
+
+  slot_duration Int?    @default(60) // minutes
+  restrictions  Json    @default("[]") // Array of restriction objects
+  daily_hours   Json? // Optional per-day hours config: { "0": { is_closed?: boolean, intervals?: [{ start_time, end_time }], slot_duration?: number }, ... }
+  is_active     Boolean @default(true)
+
+  // Relations
+  // time_slots TimeSlot[]
+  holidays          Holiday[]
+  breakTimes        BreakTime[]
+  timeSlots         TimeSlot[]
+  garage            Garage             @relation(fields: [garage_id], references: [id], onDelete: Cascade)
+  scheduleIntervals ScheduleInterval[]
+
+  @@map("schedules")
+}
+
+model ScheduleInterval {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  day_of_week   DayOfWeek
+  is_closed     Boolean   @default(false) // if true, the day is fully closed
+  slot_duration Int?      @default(60) // minutes
+  buffer_time   Int?      @default(0) // minutes
+  open_time     DateTime? @db.Time(6)
+  close_time    DateTime? @db.Time(6)
+  schedule_id   String
+  schedule      Schedule  @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+
+  @@unique([schedule_id, day_of_week])
+  @@index([schedule_id])
+  @@map("schedule_intervals")
+}
+
+/// Calendar-specific break window (UTC-aware). For repeating lunch hours, prefer template rows or `ScheduleInterval`.
+model BreakTime {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  starts_at DateTime @db.Timestamptz(6)
+  ends_at   DateTime @db.Timestamptz(6)
+
+  description String?
+
+  schedule_id String
+  schedule    Schedule @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+
+  @@index([schedule_id])
+  @@index([starts_at, ends_at])
+  @@map("break_times")
+}
+
+model Holiday {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  name         String?
+  date         DateTime
+  is_recurring Boolean  @default(false)
+  schedule_id  String
+  schedule     Schedule @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+
+  @@index([schedule_id])
+  @@index([date])
+  @@map("holidays")
+}
+
+/// Bookable window in absolute time (store in UTC; display in garage/local TZ in app).
+model TimeSlot {
+  id String @id @default(cuid())
+
+  garage_id String?
+  garage    Garage? @relation(fields: [garage_id], references: [id], onDelete: Cascade)
+
+  starts_at DateTime @db.Timestamptz(6)
+  ends_at   DateTime @db.Timestamptz(6)
+
+  is_available Boolean @default(true)
+  is_blocked   Boolean @default(false)
+
+  booking_id  String? @unique
+  schedule_id String?
+  customer_id String?
+
+  customer User?     @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+  schedule Schedule? @relation(fields: [schedule_id], references: [id], onDelete: SetNull)
+  booking  Booking?
+
+  @@unique([garage_id, starts_at])
+  @@index([garage_id, starts_at, ends_at])
+  @@index([starts_at, ends_at])
+  @@index([schedule_id])
+  @@index([customer_id])
+  @@map("time_slots")
+}
+
+enum ServiceType {
+  MOT
+  RETEST
+  OTHERS
+}
+
+model Service {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  title     String
+  type      ServiceType
+  price     Decimal?    @db.Decimal(12, 2)
+  garage_id String
+
+  garage       Garage        @relation(fields: [garage_id], references: [id], onDelete: Cascade)
+  bookingItems BookingItem[]
+
+  @@index([garage_id])
+  @@index([type])
+  @@map("services")
+}
+
+model Ucode {
+  id         String      @id @default(cuid())
+  created_at DateTime    @default(now())
+  updated_at DateTime    @updatedAt
+  status     UcodeStatus @default(ACTIVE)
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  token      String?
+  email      String?
+  expired_at DateTime?
+
+  @@index([user_id])
+  @@index([token])
+  @@index([expired_at])
+  @@map("ucodes")
+}
+
+model Role {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  status RoleStatus @default(ACTIVE)
+  title  String?
+  name   String?
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  permission_roles PermissionRole[]
+  role_users       RoleUser[]
+  permissions      Permission[]     @relation("PermissionToRole")
+
+  @@index([user_id])
+  @@index([status])
+  @@index([deleted_at])
+  @@map("roles")
+}
+
+model Permission {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  status     PermissionStatus @default(ACTIVE)
+  title      String?
+  action     String?
+  subject    String?
+  conditions String?
+  fields     String?
+
+  permission_roles PermissionRole[]
+  roles            Role[]           @relation("PermissionToRole")
+
+  @@index([status])
+  @@index([deleted_at])
+  @@index([action, subject])
+  @@map("permissions")
+}
+
+model PermissionRole {
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  permission_id String
+  permission    Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+
+  role_id String
+  role    Role   @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@id([permission_id, role_id])
+  @@index([role_id])
+  @@index([permission_id])
+  @@map("permission_roles")
+}
+
+model RoleUser {
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  role_id String
+  role    Role   @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  user_id String
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([role_id, user_id])
+  @@index([user_id])
+  @@map("role_users")
+}
+
+model Vehicle {
+  id                    String    @id @default(cuid())
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  mot_expiry_date       DateTime?
+  mot_last_checked_at   DateTime?
+  reminder_last_sent_at DateTime?
+  year_of_manufacture   Int?
+
+  user_id             String?
+  registration_number String  @unique
+  make                String?
+  model               String?
+  color               String?
+  fuel_type           String?
+  engine_capacity     Int?
+  co2_emissions       Int?
+  mot_status          String? // PASSED, FAILED, EXPIRED (derived or from DVSA)
+  is_expired          Boolean @default(false)
+  raw_mot_data        Json?
+  raw_dvla_data       Json?
+  raw_mot_status      String? // PASSED, FAILED, EXPIRED (derived or from DVSA)
+
+  mot_history MotHistory[]
+  user        User?        @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  bookings    Booking[]
+
+  @@index([user_id])
+  @@index([mot_expiry_date])
+}
+
+model MotHistory {
+  id                   String      @id @default(cuid())
+  created_at           DateTime    @default(now())
+  updated_at           DateTime    @updatedAt
+  vehicle_id           String
+  vehicle              Vehicle     @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
+  test_number          String?
+  test_date            DateTime?
+  expiry_date          DateTime?
+  status               String? // PASSED, FAILED
+  odometer_value       Int?
+  odometer_unit        String?
+  odometer_result_type String?
+  data_source          String?
+  registration_at_test String?
+  raw_data             Json?
+  defects              MotDefect[] // Relation to defects
+
+  @@index([vehicle_id])
+  @@index([status])
+  @@index([test_date])
+  @@map("mot_history")
+}
+
+model MotDefect {
+  id            String     @id @default(cuid())
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+  mot_report_id String
+  mot_report    MotHistory @relation(fields: [mot_report_id], references: [id], onDelete: Cascade)
+  type          String // e.g. ADVISORY, MAJOR, FAIL, USER ENTERED
+  text          String
+  dangerous     Boolean
+  raw_data      Json?
+
+  @@index([mot_report_id])
+  @@map("mot_defect")
+}
+
+// this table stores notification event
+model NotificationEvent {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  status NotificationEventStatus @default(ACTIVE)
+  type   String?
+  text   String?
+
+  notifications Notification[]
+
+  @@index([type])
+  @@index([status])
+  @@index([deleted_at])
+  @@map("notification_events")
+}
+
+model Notification {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  read_at DateTime?
+
+  status NotificationStatus @default(UNREAD)
+
+  sender_id String?
+  sender    User?   @relation("sender", fields: [sender_id], references: [id], onDelete: SetNull)
+
+  receiver_id String?
+  receiver    User?   @relation("receiver", fields: [receiver_id], references: [id], onDelete: Cascade)
+
+  notification_event_id String?
+  notification_event    NotificationEvent? @relation(fields: [notification_event_id], references: [id], onDelete: SetNull)
+
+  entity_id String?
+
+  @@index([notification_event_id])
+  @@index([status])
+  @@index([receiver_id, read_at])
+  @@index([deleted_at])
+  @@map("notifications")
+}
+
+model SubscriptionPlan {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  name        String  @unique
+  description String?
+
+  price_pence       Int
+  currency          String                 @default("GBP")
+  status            SubscriptionPlanStatus @default(ACTIVE)
+  stripe_price_id   String?
+  stripe_product_id String?
+
+  // minimal flag for admin visibility/filters
+  is_legacy_price   Boolean @default(false)
+  // trial period in days (0 = no trial, business controls trial length)
+  trial_period_days Int     @default(0)
+
+  subscriptions        Subscription[]
+  price_migration_jobs PriceMigrationJob[]
+
+  @@index([status])
+  @@index([is_legacy_price])
+  @@index([stripe_price_id])
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+  current_period_start DateTime?
+  current_period_end   DateTime?
+  next_billing_date    DateTime?
+  cancel_at            DateTime?
+
+  plan_id                String
+  stripe_subscription_id String?
+  stripe_customer_id     String?
+  user_id                String
+
+  price_pence Int
+  currency    String?            @default("GBP")
+  status      SubscriptionStatus @default(ACTIVE)
+
+  // Cancellation scheduling (from Stripe)
+  cancel_at_period_end Boolean? @default(false)
+  cancellation_reason  String?
+
+  // minimal fields for migration flow
+  is_grandfathered       Boolean   @default(false)
+  notice_sent_at         DateTime?
+  migration_scheduled_at DateTime?
+  original_price_pence   Int?
+  user                   User      @relation(fields: [user_id], references: [id], onDelete: Restrict)
+
+  plan SubscriptionPlan @relation(fields: [plan_id], references: [id], onDelete: Restrict)
+
+  price_migration_attempts PriceMigrationJobAttempt[]
+
+  @@index([user_id])
+  @@index([status])
+  @@index([stripe_subscription_id])
+  @@index([stripe_customer_id])
+  @@index([is_grandfathered, migration_scheduled_at])
+  @@index([plan_id, status])
+  @@map("subscriptions")
+}
+
+/// Bulk price-migration orchestration (notice campaign or Stripe price switch), per plan.
+enum PriceMigrationJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PriceMigrationJobKind {
+  NOTICE
+  MIGRATION
+}
+
+model PriceMigrationJob {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  plan_id String
+  plan    SubscriptionPlan @relation(fields: [plan_id], references: [id], onDelete: Restrict)
+
+  kind   PriceMigrationJobKind
+  status PriceMigrationJobStatus @default(PENDING)
+
+  started_at   DateTime?
+  completed_at DateTime?
+
+  total_count   Int @default(0)
+  success_count Int @default(0)
+  failed_count  Int @default(0)
+
+  error_message String? @db.Text
+
+  attempts PriceMigrationJobAttempt[]
+
+  @@index([status])
+  @@index([kind])
+  @@index([created_at])
+  @@index([plan_id, status, created_at])
+  @@map("price_migration_jobs")
+}
+
+/// One processing try for a single subscription inside a price migration job.
+model PriceMigrationJobAttempt {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  job_id String
+  job    PriceMigrationJob @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  subscription_id String
+  subscription    Subscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+
+  /// Denormalized Subscription.user_id for filtered queries (no join).
+  subscriber_id String
+
+  success        Boolean   @default(false)
+  error_message  String?   @db.Text
+  attempt_number Int       @default(1)
+  retry_after    DateTime?
+
+  @@index([job_id])
+  @@index([subscription_id])
+  @@index([subscriber_id])
+  @@index([retry_after])
+  @@index([created_at])
+  @@map("price_migration_job_attempts")
+}
+
+model Booking {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  order_date DateTime
+
+  customer_id         String?
+  slot_id             String?       @unique
+  additional_services String? // Free-text note from driver
+  status              BookingStatus @default(PENDING)
+
+  vehicle_id    String?
+  garage_id     String?
+  total_amount  Decimal? @db.Decimal(12, 2)
+  cancel_reason String? // Reason for cancellation
+  cancelled_by  String? // "DRIVER" or "GARAGE" - who cancelled
+
+  // FIXED: Add @unique to timeSlotId for one-to-one relation
+  // Relations
+  slot                 TimeSlot?            @relation(fields: [slot_id], references: [id], onDelete: SetNull)
+  customer             User?                @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+  vehicle              Vehicle?             @relation(fields: [vehicle_id], references: [id], onDelete: SetNull)
+  garage               Garage?              @relation(fields: [garage_id], references: [id], onDelete: SetNull)
+  items                BookingItem[]
+  payment_transactions PaymentTransaction[]
+
+  @@index([customer_id])
+  @@index([vehicle_id])
+  @@index([status])
+  @@index([order_date])
+  @@index([garage_id, status, order_date])
+  @@map("bookings")
+}
+
+model BookingItem {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  booking_id String
+  service_id String
+
+  /// Line quantity (e.g. number of MOT slots / service units).
+  quantity Int @default(1)
+
+  /// Unit price at booking time (snapshot for invoices, refunds, disputes).
+  unit_price Decimal @db.Decimal(12, 2)
+
+  booking Booking @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [service_id], references: [id], onDelete: Restrict)
+
+  @@index([booking_id])
+  @@index([service_id])
+}
+
+model PaymentTransaction {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  entity_id String?
+  type      PaymentTransactionKind @default(SUBSCRIPTION)
+
+  provider         String?
+  reference_number String?
+  status           PaymentTransactionStatus @default(PENDING)
+  amount           Decimal?                 @db.Decimal(12, 2)
+  currency         String?
+
+  paid_amount   Decimal? @db.Decimal(12, 2)
+  paid_currency String?
+  raw_status    String?
+  booking_id    String?
+  booking       Booking? @relation(fields: [booking_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id])
+  @@index([booking_id])
+  @@index([status])
+  @@index([type])
+  @@index([reference_number])
+  @@index([created_at])
+  @@map("payment_transactions")
+}
+
+model Contact {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  first_name   String?
+  last_name    String?
+  email        String?
+  phone_number String?
+  message      String?
+
+  @@index([email])
+  @@index([deleted_at])
+  @@map("contacts")
+}
+
+model Setting {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  category      String?
+  label         String?
+  description   String?
+  key           String? @unique
+  default_value String?
+
+  user_settings UserSetting[]
+
+  @@index([category])
+  @@map("settings")
+}
+
+model UserSetting {
+  id         String    @id @default(cuid())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  setting_id String?
+  setting    Setting? @relation(fields: [setting_id], references: [id], onDelete: Cascade)
+
+  value String?
+
+  @@index([setting_id])
+  @@index([user_id, setting_id])
+  @@map("user_settings")
+}
+
+model PostCodeMap {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  postcode String  @unique
+  /// Outcode (area). e.g. "HA3"
+  outcode  String?
+
+  latitude  Float
+  longitude Float
+  source    String? @default("internal")
+
+  @@index([outcode])
+  @@map("post_code_map")
+}
+
+/// Append-only audit trail: who changed what, when, with optional before/after JSON.
+model AuditLog {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now()) @db.Timestamptz(6) // UTC precise timestamp
+
+  // **Core: WHAT changed**
+  table_name String // e.g. "Subscription", "Garage", "User"
+  record_id  String // Target record's ID
+  action     AuditAction // CREATE, UPDATE, DELETE, LOGIN, PRICE_CHANGE
+
+  // **WHO did it** (Null for system/cron jobs)
+  actor_id   String? // User ID, Admin ID, or "system"
+  actor_type String? // "user", "admin", "system", "webhook"
+  actor_ip   String? // Client IP (security)
+  user_agent String? // Browser/device info
+
+  // **Flexible CHANGE tracking** (JSONB for any schema)
+  old_values Json? // BEFORE state { "price_pence": 990, "status": "ACTIVE" }
+  new_values Json? // AFTER state { "price_pence": 1290, "status": "ACTIVE" }
+  changes    Json? // Optional field-level diff summary
+
+  // **Business Context** (Garage app specific)
+  garage_id String? // Affected garage (if applicable)
+  metadata  Json? // Extra: { "stripe_sub_id": "sub_xxx", "reason": "price_increase" }
+
+  // **Security/Compliance**
+  ip_country String? // GeoIP (GDPR)
+  is_success Boolean @default(true) // Failed attempts log
+
+  @@index([created_at])
+  @@index([table_name, record_id])
+  @@index([actor_id, created_at])
+  @@index([garage_id, created_at])
+  @@index([action])
+  @@index([table_name, action])
+  @@map("audit_logs")
+}
+
+/// Enums for type safety
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  PRICE_CHANGE
+  MIGRATION
+  CANCELLATION
+  WEBHOOK
+  SYSTEM
+}
