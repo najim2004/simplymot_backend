@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { UserRepository } from '../common/repository/user/user.repository';
@@ -20,11 +21,23 @@ export class AbilitiesGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const rules =
-      this.reflector.get<RequiredRule[]>(CHECK_ABILITY, context.getHandler()) ||
-      [];
+      this.reflector.getAllAndOverride<RequiredRule[]>(CHECK_ABILITY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) ?? [];
+
+    if (rules.length === 0) {
+      return true;
+    }
 
     const req = context.switchToHttp().getRequest();
-    const userDetails = await this.userRepository.getUserDetails(req.user.userId);
+    const userId = req.user?.id ?? req.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+
+    const userDetails = await this.userRepository.getUserDetails(userId);
 
     const ability = this.abilityFacory.defineAbility(userDetails);
 
@@ -37,6 +50,7 @@ export class AbilitiesGuard implements CanActivate {
       if (error instanceof ForbiddenError) {
         throw new ForbiddenException(error.message);
       }
+      throw error;
     }
   }
 }

@@ -37,6 +37,13 @@ export default () => ({
     port: process.env.REDIS_PORT,
   },
 
+  rateLimit: {
+    shortTtl: parseInt(process.env.RATE_LIMIT_SHORT_TTL || '60', 10),
+    shortLimit: parseInt(process.env.RATE_LIMIT_SHORT_LIMIT || '20', 10),
+    mediumTtl: parseInt(process.env.RATE_LIMIT_MEDIUM_TTL || '600', 10),
+    mediumLimit: parseInt(process.env.RATE_LIMIT_MEDIUM_LIMIT || '100', 10),
+  },
+
   security: {
     salt: 10,
   },

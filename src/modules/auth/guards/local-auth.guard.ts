@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ExecutionContext,
   HttpException,
   HttpStatus,
@@ -6,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { UserAccountStatus } from 'prisma/generated/enums';
 
 @Injectable()
 export class LocalAuthGuard extends AuthGuard('local') {
@@ -33,6 +35,22 @@ export class LocalAuthGuard extends AuthGuard('local') {
         );
       } else {
         throw err || new UnauthorizedException();
+      }
+    }
+
+    if (!user.email_verified_at) {
+      throw new BadRequestException(
+        'Please verify your email before logging in',
+      );
+    }
+
+    if (user.status !== UserAccountStatus.ACTIVE) {
+      if (user.status === UserAccountStatus.BANNED) {
+        throw new BadRequestException('Your account has been banned');
+      } else if (user.status === UserAccountStatus.SUSPENDED) {
+        throw new BadRequestException('Your account has been suspended');
+      } else {
+        throw new BadRequestException('Your account is not activated');
       }
     }
     return user;

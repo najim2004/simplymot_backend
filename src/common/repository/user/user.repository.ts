@@ -4,9 +4,9 @@ import * as QRCode from 'qrcode';
 import appConfig from '../../../config/app.config';
 import { ArrayHelper } from '../../helper/array.helper';
 import { Role } from '../../guard/role/role.enum';
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-
+import { UserKind } from 'prisma/generated/client';
 
 @Injectable()
 export class UserRepository {
@@ -46,10 +46,16 @@ export class UserRepository {
       },
       include: {
         role_users: {
+          where: {
+            role: { deleted_at: null },
+          },
           include: {
             role: {
               include: {
                 permission_roles: {
+                  where: {
+                    permission: { deleted_at: null },
+                  },
                   include: {
                     permission: true,
                   },
@@ -81,16 +87,17 @@ export class UserRepository {
    * @param param0
    * @returns
    */
-  async createSuAdminUser({ username, email, password }) {
+  async createSuAdminUser({ name, username, email, password }) {
     try {
       password = await bcrypt.hash(password, appConfig().security.salt);
 
       const user = await this.prisma.user.create({
         data: {
+          name: name,
           username: username,
           email: email,
           password: password,
-          type: 'su_admin',
+          kind: UserKind.ADMIN,
         },
       });
       return user;
@@ -143,13 +150,7 @@ export class UserRepository {
    * @param param0
    * @returns
    */
-  async attachRole({
-    user_id,
-    role_id,
-  }: {
-    user_id: string;
-    role_id: string;
-  }) {
+  async attachRole({ user_id, role_id }: { user_id: string; role_id: string }) {
     const role = await this.prisma.roleUser.create({
       data: {
         user_id: user_id,
@@ -164,13 +165,7 @@ export class UserRepository {
    * @param param0
    * @returns
    */
-  async syncRole({
-    user_id,
-    role_id,
-  }: {
-    user_id: string;
-    role_id: string;
-  }) {
+  async syncRole({ user_id, role_id }: { user_id: string; role_id: string }) {
     const role = await this.prisma.roleUser.updateMany({
       where: {
         AND: [
@@ -199,7 +194,7 @@ export class UserRepository {
     password,
     phone_number,
     role_id = null,
-    type = 'user',
+    kind = UserKind.USER,
   }: {
     name?: string;
     first_name?: string;
@@ -208,84 +203,64 @@ export class UserRepository {
     password: string;
     phone_number?: string;
     role_id?: string;
-    type?: string;
+    kind?: UserKind;
   }) {
-    try {
-      const data = {};
-      if (name) {
-        data['name'] = name;
-      }
-      if (first_name) {
-        data['first_name'] = first_name;
-      }
-      if (last_name) {
-        data['last_name'] = last_name;
-      }
-      if (phone_number) {
-        data['phone_number'] = phone_number;
-      }
-      if (email) {
-        // Check if email already exist
-        const userEmailExist = await this.exist({
-          field: 'email',
-          value: String(email),
-        });
-
-        if (userEmailExist) {
-          return {
-            success: false,
-            message: 'Email already exist',
-          };
-        }
-
-        data['email'] = email;
-      }
-      if (password) {
-        data['password'] = await bcrypt.hash(
-          password,
-          appConfig().security.salt,
-        );
-      }
-
-      if (type && ArrayHelper.inArray(type, Object.values(Role))) {
-        data['type'] = type;
-
-        // if (type == Role.VENDOR) {
-        //   data['approved_at'] = DateHelper.now();
-        // }
-      }
-
-      const user = await this.prisma.user.create({
-        data: {
-          ...data,
-        },
+    const data = {};
+    if (name) {
+      data['name'] = name;
+    }
+    if (first_name) {
+      data['first_name'] = first_name;
+    }
+    if (last_name) {
+      data['last_name'] = last_name;
+    }
+    if (phone_number) {
+      data['phone_number'] = phone_number;
+    }
+    if (email) {
+      // Check if email already exist
+      const userEmailExist = await this.exist({
+        field: 'email',
+        value: String(email),
       });
 
-      if (user) {
-        if (role_id) {
-          // attach role
-          await this.attachRole({
-            user_id: user.id,
-            role_id: role_id,
-          });
-        }
-
-        return {
-          success: true,
-          message: 'User created successfully',
-          data: user,
-        };
-      } else {
-        return {
-          success: false,
-          message: 'User creation failed',
-        };
+      if (userEmailExist) {
+        throw new ConflictException('Email already exist');
       }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
+
+      data['email'] = email;
+    }
+    if (password) {
+      data['password'] = await bcrypt.hash(password, appConfig().security.salt);
+    }
+
+    if (kind && ArrayHelper.inArray(kind, Object.values(UserKind))) {
+      data['kind'] = kind;
+
+      // if (type == Role.VENDOR) {
+      //   data['approved_at'] = DateHelper.now();
+      // }
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        ...data,
+      },
+    });
+
+    if (user) {
+      if (role_id) {
+        // attach role
+        await this.attachRole({
+          user_id: user.id,
+          role_id: role_id,
+        });
+      }
+
+      return user;
+    } else {
+      throw new Error('User creation failed');
     }
   }
 
@@ -499,104 +474,5 @@ export class UserRepository {
     } else {
       return false;
     }
-  }
-
-  // convert user type to admin/vendor
-  async convertTo(user_id: string, type: string = 'vendor') {
-    try {
-      const userDetails = await this.getUserDetails(user_id);
-      if (!userDetails) {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
-      if (userDetails.type == 'vendor') {
-        return {
-          success: false,
-          message: 'User is already a vendor',
-        };
-      }
-      await this.prisma.user.update({
-        where: { id: user_id },
-        data: { type: type },
-      });
-
-      return {
-        success: true,
-        message: 'Converted to ' + type + ' successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
-  // generate two factor secret
-  async generate2FASecret(user_id: string) {
-    const user = await this.prisma.user.findFirst({
-      where: { id: user_id },
-    });
-
-    if (!user) {
-      return {
-        success: false,
-        message: 'User not found',
-      };
-    }
-
-    const secret = speakeasy.generateSecret();
-    await this.prisma.user.update({
-      where: { id: user_id },
-      data: { two_factor_secret: secret.base32 },
-    });
-
-    const otpAuthUrl = secret.otpauth_url;
-
-    const qrCode = await QRCode.toDataURL(otpAuthUrl);
-
-    return {
-      success: true,
-      message: '2FA secret generated successfully',
-      data: {
-        secret: secret.base32,
-        qrCode: qrCode,
-      },
-    };
-  }
-
-  // verify two factor
-  async verify2FA(user_id: string, token: string): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({ where: { id: user_id } });
-
-    if (!user || !user.two_factor_secret) return false;
-
-    const isValid = speakeasy.totp.verify({
-      secret: user.two_factor_secret,
-      encoding: 'base32',
-      token,
-    });
-
-    return isValid;
-  }
-
-  // enable two factor
-  async enable2FA(user_id: string) {
-    const user = await this.prisma.user.update({
-      where: { id: user_id },
-      data: { is_two_factor_enabled: 1 },
-    });
-    return user;
-  }
-
-  // disable two factor
-  async disable2FA(user_id: string) {
-    const user = await this.prisma.user.update({
-      where: { id: user_id },
-      data: { is_two_factor_enabled: 0, two_factor_secret: null },
-    });
-    return user;
   }
 }

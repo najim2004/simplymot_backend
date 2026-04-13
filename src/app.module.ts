@@ -1,10 +1,13 @@
 // external imports
 import { MiddlewareConsumer, Module } from '@nestjs/common';
-// import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-// import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { RedisModule } from '@nestjs-modules/ioredis';
+import { CacheModule } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-ioredis-yet';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 
 // internal imports
 import appConfig from './config/app.config';
@@ -13,12 +16,11 @@ import { AppService } from './app.service';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { AuthModule } from './modules/auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
-// import { ThrottlerBehindProxyGuard } from './common/guard/throttler-behind-proxy.guard';
+import { ThrottlerBehindProxyGuard } from './common/guard/throttler-behind-proxy.guard';
 import { AbilityModule } from './ability/ability.module';
 import { MailModule } from './mail/mail.module';
 import { ApplicationModule } from './modules/application/application.module';
 import { AdminModule } from './modules/admin/admin.module';
-import { ChatModule } from './modules/chat/chat.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { PrometheusModule } from './prometheus/prometheus.module';
 import { RepositoryModule } from './common/repository/repository.module';
@@ -50,24 +52,36 @@ import { ProfileModule } from './modules/profile/profile.module';
         port: +appConfig().redis.port,
       },
     }),
-    // disabling throttling for dev
-    // ThrottlerModule.forRoot([
-    //   {
-    //     name: 'short',
-    //     ttl: 1000,
-    //     limit: 3,
-    //   },
-    //   {
-    //     name: 'medium',
-    //     ttl: 10000,
-    //     limit: 20,
-    //   },
-    //   {
-    //     name: 'long',
-    //     ttl: 60000,
-    //     limit: 100,
-    //   },
-    // ]),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      useFactory: async () => ({
+        store: await redisStore({
+          host: appConfig().redis.host,
+          port: +appConfig().redis.port,
+          password: appConfig().redis.password || undefined,
+          ttl: 60 * 5,
+        }),
+      }),
+    }),
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          name: 'short',
+          ttl: appConfig().rateLimit.shortTtl * 1000,
+          limit: appConfig().rateLimit.shortLimit,
+        },
+        {
+          name: 'medium',
+          ttl: appConfig().rateLimit.mediumTtl * 1000,
+          limit: appConfig().rateLimit.mediumLimit,
+        },
+      ],
+      storage: new ThrottlerStorageRedisService({
+        host: appConfig().redis.host,
+        port: +appConfig().redis.port,
+        password: appConfig().redis.password || undefined,
+      }),
+    }),
     // General modules
     PrismaModule,
     RepositoryModule,
@@ -76,22 +90,16 @@ import { ProfileModule } from './modules/profile/profile.module';
     MailModule,
     ApplicationModule,
     AdminModule,
-    ChatModule,
     PaymentModule,
     PrometheusModule,
     ProfileModule,
   ],
   controllers: [AppController],
   providers: [
-    // disabling throttling for dev
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: ThrottlerGuard,
-    // },
-    // disbling throttling for dev {
-    //   provide: APP_GUARD,
-    //   useClass: ThrottlerBehindProxyGuard,
-    // },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerBehindProxyGuard,
+    },
     AppService,
   ],
 })

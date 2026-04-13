@@ -1,5 +1,11 @@
 // external imports
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
@@ -12,13 +18,26 @@ import { UcodeRepository } from '../../common/repository/ucode/ucode.repository'
 import { MailService } from '../../mail/mail.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { SojebStorage } from '../../common/lib/Disk/SojebStorage';
-import { DateHelper } from '../../common/helper/date.helper';
 import { StripePayment } from '../../common/lib/Payment/stripe/StripePayment';
 import { StringHelper } from '../../common/helper/string.helper';
-import { CreateUserDto } from './dto/create-user.dto';
+import {
+  ChangeEmailDto,
+  ChangePasswordDto,
+  RegisterUserDto,
+  ForgotPasswordDto,
+  RequestEmailChangeDto,
+  ResendVerificationEmailDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+  CheckOTPValidationDto,
+} from './dto/auth.dto';
+import { UserAccountStatus, UserKind } from 'prisma/generated/enums';
+import { Prisma } from 'prisma/generated/client';
 
 @Injectable()
 export class AuthService {
+  private static readonly PROFILE_CACHE_TTL_SECONDS = 60 * 5;
+
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
@@ -28,154 +47,130 @@ export class AuthService {
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
-  async me(userId: string) {
-    try {
-      const user = await this.prisma.user.findFirst({
-        where: {
-          id: userId,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          avatar: true,
-          address: true,
-          phone_number: true,
-          type: true,
-          gender: true,
-          date_of_birth: true,
-          created_at: true,
-        },
-      });
+  private getProfileCacheKey(userId: string) {
+    return `cache:auth:me:${userId}`;
+  }
 
-      if (!user) {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
+  async me(id: string) {
+    const cacheKey = this.getProfileCacheKey(id);
+    const cachedUser = await this.redis.get(cacheKey);
 
-      if (user.avatar) {
-        user['avatar_url'] = SojebStorage.url(
-          appConfig().storageUrl.avatar + user.avatar,
-        );
-      }
-
-      if (user) {
-        return {
-          success: true,
-          data: user,
-        };
-      } else {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
-    } catch (error) {
+    if (cachedUser) {
       return {
-        success: false,
-        message: error.message,
+        success: true,
+        data: JSON.parse(cachedUser),
       };
     }
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+        address: true,
+        phone_number: true,
+        kind: true,
+        garages: {
+          select: {
+            id: true,
+            garage_name: true,
+            vts_number: true,
+            contact_email: true,
+            phone_number: true,
+          },
+          take: 1,
+        },
+        created_at: true,
+        email_verified_at: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.avatar) {
+      user['avatar_url'] = SojebStorage.url(
+        appConfig().storageUrl.avatar + user.avatar,
+      );
+    }
+
+    await this.redis.set(
+      cacheKey,
+      JSON.stringify(user),
+      'EX',
+      AuthService.PROFILE_CACHE_TTL_SECONDS,
+    );
+
+    return {
+      success: true,
+      data: user,
+    };
   }
 
   async updateUser(
-    userId: string,
+    id: string,
     updateUserDto: UpdateUserDto,
-    image?: Express.Multer.File,
+    avatar?: Express.Multer.File,
   ) {
-    try {
-      const data: any = {};
-      if (updateUserDto.name) {
-        data.name = updateUserDto.name;
-      }
-      if (updateUserDto.first_name) {
-        data.first_name = updateUserDto.first_name;
-      }
-      if (updateUserDto.last_name) {
-        data.last_name = updateUserDto.last_name;
-      }
-      if (updateUserDto.phone_number) {
-        data.phone_number = updateUserDto.phone_number;
-      }
-      if (updateUserDto.country) {
-        data.country = updateUserDto.country;
-      }
-      if (updateUserDto.state) {
-        data.state = updateUserDto.state;
-      }
-      if (updateUserDto.local_government) {
-        data.local_government = updateUserDto.local_government;
-      }
-      if (updateUserDto.city) {
-        data.city = updateUserDto.city;
-      }
-      if (updateUserDto.zip_code) {
-        data.zip_code = updateUserDto.zip_code;
-      }
-      if (updateUserDto.address) {
-        data.address = updateUserDto.address;
-      }
-      if (updateUserDto.gender) {
-        data.gender = updateUserDto.gender;
-      }
-      if (updateUserDto.date_of_birth) {
-        data.date_of_birth = DateHelper.format(updateUserDto.date_of_birth);
-      }
-      if (image) {
-        // delete old image from storage
-        const oldImage = await this.prisma.user.findFirst({
-          where: { id: userId },
-          select: { avatar: true },
-        });
-        if (oldImage.avatar) {
+    const data: Prisma.UserUpdateInput = {};
+    if (updateUserDto.name) data.name = updateUserDto.name;
+
+    if (updateUserDto.phone_number)
+      data.phone_number = updateUserDto.phone_number;
+
+    if (avatar) {
+      // delete old image from storage
+      const oldImage = await this.prisma.user.findFirst({
+        where: { id },
+        select: { avatar: true },
+      });
+      if (oldImage.avatar) {
+        try {
           await SojebStorage.delete(
             appConfig().storageUrl.avatar + oldImage.avatar,
           );
+        } catch (error) {
+          console.error('Failed to delete old avatar:', error.message);
         }
-
-        // upload file
-        const fileName = `${StringHelper.randomString()}${image.originalname}`;
-        await SojebStorage.put(
-          appConfig().storageUrl.avatar + fileName,
-          image.buffer,
-        );
-
-        data.avatar = fileName;
       }
-      const user = await this.userRepository.getUserDetails(userId);
-      if (user) {
-        await this.prisma.user.update({
-          where: { id: userId },
-          data: {
-            ...data,
-          },
-        });
 
-        return {
-          success: true,
-          message: 'User updated successfully',
-        };
-      } else {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
-    } catch (error) {
+      // upload file
+      const fileName = `${StringHelper.randomString()}${avatar.originalname}`;
+      await SojebStorage.put(
+        appConfig().storageUrl.avatar + fileName,
+        avatar.buffer,
+      );
+
+      data.avatar = fileName;
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+    if (user) {
+      await this.prisma.user.update({
+        where: { id },
+        data: {
+          ...data,
+        },
+      });
+      await this.redis.del(this.getProfileCacheKey(id));
+
       return {
-        success: false,
-        message: error.message,
+        success: true,
+        message: 'User updated successfully',
       };
+    } else {
+      throw new NotFoundException('User not found');
     }
   }
 
-  async validateUser(
-    email: string,
-    pass: string,
-    token?: string,
-  ): Promise<any> {
+  async validateUser(email: string, pass: string): Promise<any> {
     const _password = pass;
     const user = await this.prisma.user.findFirst({
       where: {
@@ -190,146 +185,114 @@ export class AuthService {
       });
       if (_isValidPassword) {
         const { password, ...result } = user;
-        if (user.is_two_factor_enabled) {
-          if (token) {
-            const isValid = await this.userRepository.verify2FA(user.id, token);
-            if (!isValid) {
-              throw new UnauthorizedException('Invalid token');
-              // return {
-              //   success: false,
-              //   message: 'Invalid token',
-              // };
-            }
-          } else {
-            throw new UnauthorizedException('Token is required');
-            // return {
-            //   success: false,
-            //   message: 'Token is required',
-            // };
-          }
+        if (user.status === UserAccountStatus.BANNED) {
+          throw new UnauthorizedException('Account not approved or banned');
+        }
+        if (user.status === UserAccountStatus.SUSPENDED) {
+          throw new UnauthorizedException('Account suspended');
         }
         return result;
       } else {
         throw new UnauthorizedException('Password not matched');
-        // return {
-        //   success: false,
-        //   message: 'Password not matched',
-        // };
       }
     } else {
       throw new UnauthorizedException('Email not found');
-      // return {
-      //   success: false,
-      //   message: 'Email not found',
-      // };
     }
   }
 
-  async login({ email, userId }) {
-    try {
-      const payload = { email: email, sub: userId };
+  async login({ email, id }) {
+    const payload = { email: email, sub: id };
 
-      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
-      const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-      const user = await this.userRepository.getUserDetails(userId);
+    const user = await this.userRepository.getUserDetails(id);
 
-      // store refreshToken
-      await this.redis.set(
-        `refresh_token:${user.id}`,
-        refreshToken,
-        'EX',
-        60 * 60 * 24 * 7, // 7 days in seconds
-      );
-
-      return {
-        success: true,
-        message: 'Logged in successfully',
-        authorization: {
-          type: 'bearer',
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        },
-        type: user.type,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
+    return {
+      success: true,
+      message: 'Logged in successfully',
+      authorization: {
+        type: 'bearer',
+        access_token: accessToken,
+      },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        kind: user.kind,
+        avatar: user.avatar,
+        phone_number: user.phone_number,
+        address: user.address,
+        city: user.city,
+        state: user.state,
+      },
+    };
   }
 
-  async refreshToken(user_id: string, refreshToken: string) {
-    try {
-      const storedToken = await this.redis.get(`refresh_token:${user_id}`);
+  // async refreshToken(user_id: string, refreshToken: string) {
+  //   const storedToken = await this.redis.get(`refresh_token:${user_id}`);
 
-      if (!storedToken || storedToken != refreshToken) {
-        return {
-          success: false,
-          message: 'Refresh token is required',
-        };
-      }
+  //   if (!storedToken || storedToken != refreshToken) {
+  //     return {
+  //       success: false,
+  //       message: 'Refresh token is required',
+  //     };
+  //   }
 
-      if (!user_id) {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
+  //   if (!user_id) {
+  //     return {
+  //       success: false,
+  //       message: 'User not found',
+  //     };
+  //   }
 
-      const userDetails = await this.userRepository.getUserDetails(user_id);
-      if (!userDetails) {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
+  //   const userDetails = await this.userRepository.getUserDetails(user_id);
+  //   if (!userDetails) {
+  //     return {
+  //       success: false,
+  //       message: 'User not found',
+  //     };
+  //   }
 
-      const payload = { email: userDetails.email, sub: userDetails.id };
-      const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+  //   const payload = { email: userDetails.email, sub: userDetails.id };
+  //   const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
 
-      return {
-        success: true,
-        authorization: {
-          type: 'bearer',
-          access_token: accessToken,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
+  //   return {
+  //     success: true,
+  //     authorization: {
+  //       type: 'bearer',
+  //       access_token: accessToken,
+  //     },
+  //   };
+  // }
 
-  async revokeRefreshToken(user_id: string) {
-    try {
-      const storedToken = await this.redis.get(`refresh_token:${user_id}`);
-      if (!storedToken) {
-        return {
-          success: false,
-          message: 'Refresh token not found',
-        };
-      }
+  // async revokeRefreshToken(user_id: string) {
+  //   const storedToken = await this.redis.get(`refresh_token:${user_id}`);
+  //   if (!storedToken) {
+  //     return {
+  //       success: false,
+  //       message: 'Refresh token not found',
+  //     };
+  //   }
 
-      await this.redis.del(`refresh_token:${user_id}`);
+  //   await this.redis.del(`refresh_token:${user_id}`);
 
-      return {
-        success: true,
-        message: 'Refresh token revoked successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
+  //   return {
+  //     success: true,
+  //     message: 'Refresh token revoked successfully',
+  //   };
+  // }
 
-  async register(createUserDto: CreateUserDto) {
-    const { name, email, password, kind } = createUserDto;
+  async register(registerUserDto: RegisterUserDto) {
+    const {
+      name,
+      email,
+      password,
+      kind,
+      garage_name,
+      vts_number,
+      primary_contact,
+      phone_number,
+    } = registerUserDto;
     // Check if email already exist
     const userEmailExist = await this.userRepository.exist({
       field: 'email',
@@ -345,374 +308,357 @@ export class AuthService {
       email: email,
       password: password,
       kind: kind,
+      phone_number: phone_number,
     });
 
-    if (user == null && user.success == false) {
-      return {
-        success: false,
-        message: 'Failed to create account',
-      };
-    }
-
-    // create stripe customer account
-    const stripeCustomer = await StripePayment.createCustomer({
-      user_id: user.data.id,
-      email: email,
-      name: name,
-    });
-
-    if (stripeCustomer) {
-      await this.prisma.user.update({
-        where: {
-          id: user.data.id,
-        },
+    if (kind === UserKind.GARAGE) {
+      await this.prisma.garage.create({
         data: {
-          billing_id: stripeCustomer.id,
+          owner: {
+            connect: {
+              id: user.id,
+            },
+          },
+          garage_name: garage_name,
+          vts_number: vts_number,
+          contact_email: primary_contact || email,
+          phone_number: phone_number,
         },
       });
-    }
-
-    // ----------------------------------------------------
-    // // create otp code
-    // const token = await this.ucodeRepository.createToken({
-    //   userId: user.data.id,
-    //   isOtp: true,
-    // });
-
-    // // send otp code to email
-    // await this.mailService.sendOtpCodeToEmail({
-    //   email: email,
-    //   name: name,
-    //   otp: token,
-    // });
-
-    // return {
-    //   success: true,
-    //   message: 'We have sent an OTP code to your email',
-    // };
-
-    // ----------------------------------------------------
-
-    // Generate verification token
-    const token = await this.ucodeRepository.createVerificationToken({
-      userId: user.data.id,
-      email: email,
-    });
-
-    // Send verification email with token
-    await this.mailService.sendVerificationLink({
-      email,
-      name: email,
-      token: token.token,
-      type: type,
-    });
-
-    return {
-      success: true,
-      message: 'We have sent a verification link to your email',
-    };
-  }
-
-  async forgotPassword(email) {
-    try {
-      const user = await this.userRepository.exist({
-        field: 'email',
-        value: email,
-      });
-
-      if (user) {
-        const token = await this.ucodeRepository.createToken({
-          userId: user.id,
-          isOtp: true,
-        });
-
-        await this.mailService.sendOtpCodeToEmail({
+      try {
+        // create stripe customer account
+        const stripeCustomer = await StripePayment.createCustomer({
+          user_id: user.id,
           email: email,
-          name: user.name,
-          otp: token,
+          name: name,
         });
 
-        return {
-          success: true,
-          message: 'We have sent an OTP code to your email',
-        };
-      } else {
-        return {
-          success: false,
-          message: 'Email not found',
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
-  async resetPassword({ email, token, password }) {
-    try {
-      const user = await this.userRepository.exist({
-        field: 'email',
-        value: email,
-      });
-
-      if (user) {
-        const existToken = await this.ucodeRepository.validateToken({
-          email: email,
-          token: token,
-        });
-
-        if (existToken) {
-          await this.userRepository.changePassword({
-            email: email,
-            password: password,
-          });
-
-          // delete otp code
-          await this.ucodeRepository.deleteToken({
-            email: email,
-            token: token,
-          });
-
-          return {
-            success: true,
-            message: 'Password updated successfully',
-          };
-        } else {
-          return {
-            success: false,
-            message: 'Invalid token',
-          };
-        }
-      } else {
-        return {
-          success: false,
-          message: 'Email not found',
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
-  async verifyEmail({ email, token }) {
-    try {
-      const user = await this.userRepository.exist({
-        field: 'email',
-        value: email,
-      });
-
-      if (user) {
-        const existToken = await this.ucodeRepository.validateToken({
-          email: email,
-          token: token,
-        });
-
-        if (existToken) {
+        if (stripeCustomer) {
           await this.prisma.user.update({
             where: {
               id: user.id,
             },
             data: {
-              email_verified_at: new Date(Date.now()),
+              billing_id: stripeCustomer.id,
             },
           });
-
-          // delete otp code
-          // await this.ucodeRepository.deleteToken({
-          //   email: email,
-          //   token: token,
-          // });
-
-          return {
-            success: true,
-            message: 'Email verified successfully',
-          };
-        } else {
-          return {
-            success: false,
-            message: 'Invalid token',
-          };
         }
-      } else {
-        return {
-          success: false,
-          message: 'Email not found',
-        };
+      } catch (error) {
+        console.error(
+          'Stripe customer creation failed on garage registration api:',
+          error.message,
+        );
       }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
     }
+
+    // ----------------------------------------------------
+    // // create otp code
+    const token = await this.ucodeRepository.createToken({
+      userId: user.id,
+      isOtp: true,
+    });
+
+    // // send otp code to email
+    try {
+      await this.mailService.sendOtpCodeToEmail({
+        email: email,
+        name: name,
+        otp: token,
+      });
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    return {
+      success: true,
+      message: 'We have sent an OTP code to your email',
+    };
+
+    // ----------------------------------------------------
+
+    // Generate verification token
+    // const token = await this.ucodeRepository.createVerificationToken({
+    //   userId: user.data.id,
+    //   email: email,
+    // });
+
+    // Send verification email with token
+    // await this.mailService.sendVerificationLink({
+    //   email,
+    //   name: email,
+    //   token: token.token,
+    //   type: type,
+    // });
+
+    // return {
+    //   success: true,
+    //   message: 'We have sent a verification link to your email',
+    // };
   }
 
-  async resendVerificationEmail(email: string) {
-    try {
-      const user = await this.userRepository.getUserByEmail(email);
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const { email } = forgotPasswordDto;
+    const user = await this.userRepository.exist({
+      field: 'email',
+      value: email,
+    });
 
-      if (user) {
-        // create otp code
-        const token = await this.ucodeRepository.createToken({
-          userId: user.id,
-          isOtp: true,
-        });
+    if (user) {
+      const token = await this.ucodeRepository.createToken({
+        userId: user.id,
+        isOtp: true,
+      });
 
-        // send otp code to email
+      try {
         await this.mailService.sendOtpCodeToEmail({
           email: email,
           name: user.name,
           otp: token,
         });
-
-        return {
-          success: true,
-          message: 'We have sent a verification code to your email',
-        };
-      } else {
-        return {
-          success: false,
-          message: 'Email not found',
-        };
+      } catch (error) {
+        throw new BadRequestException(error.message);
       }
-    } catch (error) {
+
       return {
-        success: false,
-        message: error.message,
+        success: true,
+        message: 'We have sent an OTP code to your email',
       };
+    } else {
+      throw new NotFoundException('Email not found');
     }
   }
 
-  async changePassword({ user_id, oldPassword, newPassword }) {
-    try {
-      const user = await this.userRepository.getUserDetails(user_id);
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const { email, token, password } = resetPasswordDto;
+    const user = await this.userRepository.exist({
+      field: 'email',
+      value: email,
+    });
 
-      if (user) {
-        const _isValidPassword = await this.userRepository.validatePassword({
-          email: user.email,
-          password: oldPassword,
-        });
-        if (_isValidPassword) {
-          await this.userRepository.changePassword({
-            email: user.email,
-            password: newPassword,
-          });
+    if (user) {
+      const existToken = await this.ucodeRepository.validateToken({
+        email: email,
+        token: token,
+      });
 
-          return {
-            success: true,
-            message: 'Password updated successfully',
-          };
-        } else {
-          return {
-            success: false,
-            message: 'Invalid password',
-          };
-        }
-      } else {
-        return {
-          success: false,
-          message: 'Email not found',
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
-  async requestEmailChange(user_id: string, email: string) {
-    try {
-      const user = await this.userRepository.getUserDetails(user_id);
-      if (user) {
-        const token = await this.ucodeRepository.createToken({
-          userId: user.id,
-          isOtp: true,
+      if (existToken) {
+        await this.userRepository.changePassword({
           email: email,
+          password: password,
         });
 
-        await this.mailService.sendOtpCodeToEmail({
+        // delete otp code
+        await this.ucodeRepository.deleteToken({
           email: email,
-          name: email,
-          otp: token,
-        });
-
-        return {
-          success: true,
-          message: 'We have sent an OTP code to your email',
-        };
-      } else {
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
-  }
-
-  async changeEmail({
-    user_id,
-    new_email,
-    token,
-  }: {
-    user_id: string;
-    new_email: string;
-    token: string;
-  }) {
-    try {
-      const user = await this.userRepository.getUserDetails(user_id);
-
-      if (user) {
-        const existToken = await this.ucodeRepository.validateToken({
-          email: new_email,
           token: token,
-          forEmailChange: true,
         });
 
-        if (existToken) {
-          await this.userRepository.changeEmail({
-            user_id: user.id,
-            new_email: new_email,
-          });
-
-          // delete otp code
-          await this.ucodeRepository.deleteToken({
-            email: new_email,
-            token: token,
-          });
-
-          return {
-            success: true,
-            message: 'Email updated successfully',
-          };
-        } else {
-          return {
-            success: false,
-            message: 'Invalid token',
-          };
-        }
-      } else {
         return {
-          success: false,
-          message: 'User not found',
+          success: true,
+          message: 'Password updated successfully',
         };
+      } else {
+        throw new BadRequestException('Invalid token');
       }
-    } catch (error) {
+    } else {
+      throw new NotFoundException('Email not found');
+    }
+  }
+
+  async checkOTPValidation(checkOTPValidationDto: CheckOTPValidationDto) {
+    const { email, otp } = checkOTPValidationDto;
+    const user = await this.userRepository.exist({
+      field: 'email',
+      value: email,
+    });
+
+    if (user) {
+      const existToken = await this.ucodeRepository.validateToken({
+        email: email,
+        token: otp,
+      });
+
+      if (existToken) {
+        return {
+          success: true,
+          message: 'OTP is valid',
+        };
+      } else {
+        throw new BadRequestException('Invalid OTP');
+      }
+    } else {
+      throw new NotFoundException('Email not found');
+    }
+  }
+  async verifyEmail(verifyEmailDto: VerifyEmailDto) {
+    const { email, token } = verifyEmailDto;
+    const user = await this.userRepository.exist({
+      field: 'email',
+      value: email,
+    });
+
+    if (user) {
+      const existToken = await this.ucodeRepository.validateToken({
+        email: email,
+        token: token,
+      });
+
+      if (existToken) {
+        await this.prisma.user.update({
+          where: {
+            id: user.id,
+          },
+          data: {
+            email_verified_at: new Date(Date.now()),
+          },
+        });
+
+        // delete otp code
+        // await this.ucodeRepository.deleteToken({
+        //   email: email,
+        //   token: token,
+        // });
+
+        return {
+          success: true,
+          message: 'Email verified successfully',
+        };
+      } else {
+        throw new BadRequestException('Invalid token');
+      }
+    } else {
+      throw new NotFoundException('Email not found');
+    }
+  }
+
+  async resendVerificationEmail(
+    resendVerificationEmailDto: ResendVerificationEmailDto,
+  ) {
+    const { email } = resendVerificationEmailDto;
+    const user = await this.userRepository.exist({
+      field: 'email',
+      value: email,
+    });
+
+    if (user) {
+      // create otp code
+      const token = await this.ucodeRepository.createToken({
+        userId: user.id,
+        isOtp: true,
+      });
+
+      // send otp code to email
+
+      await this.mailService.sendOtpCodeToEmail({
+        email: email,
+        name: user.name,
+        otp: token,
+      });
+
       return {
-        success: false,
-        message: error.message,
+        success: true,
+        message: 'We have sent a verification code to your email',
       };
+    } else {
+      throw new NotFoundException('Email not found');
+    }
+  }
+
+  async changePassword({
+    user_id,
+    old_password,
+    new_password,
+  }: ChangePasswordDto & { user_id: string }) {
+    const user = await this.userRepository.getUserDetails(user_id);
+
+    if (user) {
+      const _isValidPassword = await this.userRepository.validatePassword({
+        email: user.email,
+        password: old_password,
+      });
+      if (_isValidPassword) {
+        await this.userRepository.changePassword({
+          email: user.email,
+          password: new_password,
+        });
+
+        return {
+          success: true,
+          message: 'Password updated successfully',
+        };
+      } else {
+        throw new BadRequestException('Invalid password');
+      }
+    } else {
+      throw new NotFoundException('Email not found');
+    }
+  }
+
+  async requestEmailChange(
+    user_id: string,
+    requestEmailChangeDto: RequestEmailChangeDto,
+  ) {
+    const { email } = requestEmailChangeDto;
+    const user = await this.userRepository.getUserDetails(user_id);
+    if (user) {
+      const token = await this.ucodeRepository.createToken({
+        userId: user.id,
+        isOtp: true,
+        email: email,
+      });
+
+      await this.mailService.sendOtpCodeToEmail({
+        email: email,
+        name: user.name,
+        otp: token,
+      });
+
+      return {
+        success: true,
+        message: 'We have sent an OTP code to your email',
+      };
+    } else {
+      throw new NotFoundException('User not found');
+    }
+  }
+
+  async changeEmail(changeEmailDto: ChangeEmailDto) {
+    const { email, token } = changeEmailDto;
+    const user = await this.userRepository.exist({
+      field: 'email',
+      value: email,
+    });
+
+    if (user) {
+      const existToken = await this.ucodeRepository.validateToken({
+        email: email,
+        token: token,
+        forEmailChange: true,
+      });
+
+      if (existToken) {
+        await this.userRepository.changeEmail({
+          user_id: user.id,
+          new_email: email,
+        });
+
+        // delete otp code
+        await this.ucodeRepository.deleteToken({
+          email: email,
+          token: token,
+        });
+
+        await this.redis.del(this.getProfileCacheKey(user.id));
+
+        return {
+          success: true,
+          message: 'Email updated successfully',
+        };
+      } else {
+        throw new BadRequestException('Invalid token');
+      }
+    } else {
+      throw new NotFoundException('Email not found');
     }
   }
 }

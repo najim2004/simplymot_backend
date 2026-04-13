@@ -338,6 +338,14 @@
   resolved "https://registry.yarnpkg.com/@borewit/text-codec/-/text-codec-0.1.1.tgz#7e7f27092473d5eabcffef693a849f2cc48431da"
   integrity sha512-5L/uBxmjaCIX5h8Z+uu+kA9BQLkc/Wl06UGR5ajNRxu+/XjonB5i8JpgFMrPj3LXTCPA0pv8yxUvbUi+QthGGA==
 
+"@cacheable/utils@^2.3.3":
+  version "2.4.1"
+  resolved "https://registry.yarnpkg.com/@cacheable/utils/-/utils-2.4.1.tgz#614ab46e4e2adf94785d8adaadbf40873d0eb12d"
+  integrity sha512-eiFgzCbIneyMlLOmNG4g9xzF7Hv3Mga4LjxjcSC/ues6VYq2+gUbQI8JqNuw/ZM8tJIeIaBGpswAsqV2V7ApgA==
+  dependencies:
+    hashery "^1.5.1"
+    keyv "^5.6.0"
+
 "@casl/ability@6.7.3":
   version "6.7.3"
   resolved "https://registry.yarnpkg.com/@casl/ability/-/ability-6.7.3.tgz#3c831c8230ccd32bd8eebc6d10f3d7e28e473958"
@@ -1075,6 +1083,11 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
+"@keyv/serialize@^1.1.1":
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/@keyv/serialize/-/serialize-1.1.1.tgz#0c01dd3a3483882af7cf3878d4e71d505c81fc4a"
+  integrity sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==
+
 "@lukeed/csprng@^1.0.0":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@lukeed/csprng/-/csprng-1.1.0.tgz#1e3e4bd05c1cc7a0b2ddbd8a03f39f6e4b5e6cfe"
@@ -1246,6 +1259,13 @@
     "@napi-rs/nice-win32-ia32-msvc" "1.1.1"
     "@napi-rs/nice-win32-x64-msvc" "1.1.1"
 
+"@nest-lab/throttler-storage-redis@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@nest-lab/throttler-storage-redis/-/throttler-storage-redis-1.2.0.tgz#d4b5615da833ca2777ba66049fa78c530fac0ffd"
+  integrity sha512-tMkUyo68NCKTR+zILk+EC35SMYBtDPZY2mCj7ZaCietWGVTnuP4zwq9ERYfvU6kJv6h8teNZrC6MJCmY6/dljw==
+  dependencies:
+    tslib "^2.3.0"
+
 "@nestjs-modules/ioredis@^2.0.2":
   version "2.0.2"
   resolved "https://registry.yarnpkg.com/@nestjs-modules/ioredis/-/ioredis-2.0.2.tgz#b1799944c4932e26d24a930caad83cc7af34601d"
@@ -1285,6 +1305,11 @@
   dependencies:
     "@nestjs/bull-shared" "^11.0.4"
     tslib "2.8.1"
+
+"@nestjs/cache-manager@^3.1.0":
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/@nestjs/cache-manager/-/cache-manager-3.1.0.tgz#65f3be68154e48557790c0a58a55aadb92439dd0"
+  integrity sha512-pEIqYZrBcE8UdkJmZRduurvoUfdU+3kRPeO1R2muiMbZnRuqlki5klFFNllO9LyYWzrx98bd1j0PSPKSJk1Wbw==
 
 "@nestjs/cli@11.0.6":
   version "11.0.6"
@@ -3256,6 +3281,23 @@ c12@3.1.0:
     perfect-debounce "^1.0.0"
     pkg-types "^2.2.0"
     rc9 "^2.1.2"
+
+cache-manager-ioredis-yet@^2.1.2:
+  version "2.1.2"
+  resolved "https://registry.yarnpkg.com/cache-manager-ioredis-yet/-/cache-manager-ioredis-yet-2.1.2.tgz#336d1edd874703b48daa894bb3e46cc64d4194d2"
+  integrity sha512-p/5D+ADvJaZjAs12fR5l0ZJ+rK2EqbCryFdrzsMj3K+lGwNoCjB33N6V397otgreB+iwK+lssBshpkJDodiyMQ==
+  dependencies:
+    cache-manager "*"
+    ioredis "^5.4.1"
+    telejson "^7.2.0"
+
+cache-manager@*, cache-manager@^7.2.8:
+  version "7.2.8"
+  resolved "https://registry.yarnpkg.com/cache-manager/-/cache-manager-7.2.8.tgz#a9d41f3dd3b4c9b56858f868b490477efe85823f"
+  integrity sha512-0HDaDLBBY/maa/LmUVAr70XUOwsiQD+jyzCBjmUErYZUKdMS9dT59PqW59PpVqfGM7ve6H0J6307JTpkCYefHQ==
+  dependencies:
+    "@cacheable/utils" "^2.3.3"
+    keyv "^5.5.5"
 
 cacheable-lookup@^7.0.0:
   version "7.0.0"
@@ -5268,6 +5310,13 @@ has-unicode@^2.0.1:
   resolved "https://registry.yarnpkg.com/has-unicode/-/has-unicode-2.0.1.tgz#e0e6fe6a28cf51138855e086d1691e771de2a8b9"
   integrity sha512-8Rf9Y83NBReMnx0gFzA8JImQACstCYWUplepDa9xprwwtmgEZUF0h/i5xSA625zB/I37EtrswSST6OXxwaaIJQ==
 
+hashery@^1.5.1:
+  version "1.5.1"
+  resolved "https://registry.yarnpkg.com/hashery/-/hashery-1.5.1.tgz#4ba82ad54911ac617467870845d57a9fe508a400"
+  integrity sha512-iZyKG96/JwPz1N55vj2Ie2vXbhu440zfUfJvSwEqEbeLluk7NnapfGqa7LH0mOsnDxTF85Mx8/dyR6HfqcbmbQ==
+  dependencies:
+    hookified "^1.15.0"
+
 hasown@^2.0.2:
   version "2.0.2"
   resolved "https://registry.yarnpkg.com/hasown/-/hasown-2.0.2.tgz#003eaf91be7adc372e84ec59dc37252cedb80003"
@@ -5289,6 +5338,11 @@ hono@4.7.10:
   version "4.7.10"
   resolved "https://registry.yarnpkg.com/hono/-/hono-4.7.10.tgz#c2400f068ac64e1b10b575b63321d494c9e70f86"
   integrity sha512-QkACju9MiN59CKSY5JsGZCYmPZkA6sIW6OFCUp7qDjZu6S6KHtJHhAc9Uy9mV9F8PJ1/HQ3ybZF2yjCa/73fvQ==
+
+hookified@^1.15.0:
+  version "1.15.1"
+  resolved "https://registry.yarnpkg.com/hookified/-/hookified-1.15.1.tgz#b1fafeaa5489cdc29cb85546a8f837ed4ffbbcb6"
+  integrity sha512-MvG/clsADq1GPM2KGo2nyfaWVyn9naPiXrqIe4jYjXNZQt238kWyOGrsyc/DmRAQ+Re6yeo6yX/yoNCG5KAEVg==
 
 html-entities@^2.5.2:
   version "2.6.0"
@@ -6359,6 +6413,13 @@ keyv@^4.5.3, keyv@^4.5.4:
   dependencies:
     json-buffer "3.0.1"
 
+keyv@^5.5.5, keyv@^5.6.0:
+  version "5.6.0"
+  resolved "https://registry.yarnpkg.com/keyv/-/keyv-5.6.0.tgz#03044074c6b4d072d0a62c7b9fa649537baf0105"
+  integrity sha512-CYDD3SOtsHtyXeEORYRx2qBtpDJFjRTGXUtmNEMGyzYOKj1TE3tycdlho7kA1Ufx9OYWZzg52QFBGALTirzDSw==
+  dependencies:
+    "@keyv/serialize" "^1.1.1"
+
 kind-of@^6.0.2:
   version "6.0.3"
   resolved "https://registry.yarnpkg.com/kind-of/-/kind-of-6.0.3.tgz#07c05034a6c349fa06e24fa35aa76db4580ce4dd"
@@ -6624,6 +6685,11 @@ makeerror@1.0.12:
   dependencies:
     tmpl "1.0.5"
 
+map-or-similar@^1.5.0:
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/map-or-similar/-/map-or-similar-1.5.0.tgz#6de2653174adfb5d9edc33c69d3e92a1b76faf08"
+  integrity sha512-0aF7ZmVon1igznGI4VS30yugpduQW3y3GkcgGJOp7d8x8QrizhigUxjI/m2UojsXXto+jLAH3KSz+xOJTiORjg==
+
 math-intrinsics@^1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/math-intrinsics/-/math-intrinsics-1.1.0.tgz#a0dd74be81e2aa5c2f27e65ce283605ee4e2b7f9"
@@ -6645,6 +6711,13 @@ memfs@^3.4.1:
   integrity sha512-EGowvkkgbMcIChjMTMkESFDbZeSh8xZ7kNSF0hAiAN4Jh6jgHCRS0Ga/+C8y6Au+oqpezRHCfPsmJ2+DwAgiwQ==
   dependencies:
     fs-monkey "^1.0.4"
+
+memoizerific@^1.11.3:
+  version "1.11.3"
+  resolved "https://registry.yarnpkg.com/memoizerific/-/memoizerific-1.11.3.tgz#7c87a4646444c32d75438570905f2dbd1b1a805a"
+  integrity sha512-/EuHYwAPdLtXwAwSZkh/Gutery6pD2KYd44oQLhAvQp/50mpyduZh8Q7PYHXTCJ+wuXxt7oij2LXyIJOOYFPog==
+  dependencies:
+    map-or-similar "^1.5.0"
 
 mensch@^0.3.4:
   version "0.3.4"
@@ -9152,6 +9225,13 @@ teeny-request@^9.0.0:
     stream-events "^1.0.5"
     uuid "^9.0.0"
 
+telejson@^7.2.0:
+  version "7.2.0"
+  resolved "https://registry.yarnpkg.com/telejson/-/telejson-7.2.0.tgz#3994f6c9a8f8d7f2dba9be2c7c5bbb447e876f32"
+  integrity sha512-1QTEcJkJEhc8OnStBx/ILRu5J2p0GjvWsBx56bmZRqnrkdBMUe+nX92jxV+p3dB4CP6PZCdJMQJwCggkNBMzkQ==
+  dependencies:
+    memoizerific "^1.11.3"
+
 terser-webpack-plugin@^5.3.11:
   version "5.3.14"
   resolved "https://registry.yarnpkg.com/terser-webpack-plugin/-/terser-webpack-plugin-5.3.14.tgz#9031d48e57ab27567f02ace85c7d690db66c3e06"
@@ -9322,7 +9402,7 @@ tsconfig-paths@4.2.0, tsconfig-paths@^4.1.2:
     minimist "^1.2.6"
     strip-bom "^3.0.0"
 
-tslib@2.8.1, tslib@^2.0.0, tslib@^2.0.1, tslib@^2.1.0:
+tslib@2.8.1, tslib@^2.0.0, tslib@^2.0.1, tslib@^2.1.0, tslib@^2.3.0:
   version "2.8.1"
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.8.1.tgz#612efe4ed235d567e8aba5f2a5fab70280ade83f"
   integrity sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==

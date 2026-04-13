@@ -27,6 +27,7 @@ enum UserAccountStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+  BANNED
 }
 
 enum UcodeStatus {

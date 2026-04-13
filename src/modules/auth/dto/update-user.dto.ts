@@ -1,68 +1,30 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { CreateUserDto } from './create-user.dto';
-import { IsOptional } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 
-export class UpdateUserDto extends PartialType(CreateUserDto) {
-  @IsOptional()
-  @ApiProperty({
-    description: 'Country',
-    example: 'Nigeria',
+/** Used with `multipart/form-data`; all fields optional. */
+export class UpdateUserDto {
+  @ApiPropertyOptional({
+    description: 'Full legal name of the user',
+    example: 'John Doe',
+    minLength: 2,
   })
-  country?: string;
+  @IsString()
+  @IsOptional()
+  name?: string;
 
-  @IsOptional()
-  @ApiProperty({
-    description: 'State',
-    example: 'Lagos',
+  @ApiPropertyOptional({
+    description: 'Contact number (E.164 or local format)',
+    example: '+19876543210',
   })
-  state?: string;
-
   @IsOptional()
-  @ApiProperty({
-    description: 'City',
-    example: 'Lagos',
-  })
-  city?: string;
-
-  @IsOptional()
-  @ApiProperty({
-    description: 'Local government',
-    example: 'Lagos',
-  })
-  local_government?: string;
-
-  @IsOptional()
-  @ApiProperty({
-    description: 'Zip code',
-    example: '123456',
-  })
-  zip_code?: string;
-
-  @IsOptional()
-  @ApiProperty({
-    description: 'Phone number',
-    example: '+91 9876543210',
-  })
+  @IsString()
   phone_number?: string;
 
-  @IsOptional()
-  @ApiProperty({
-    description: 'Address',
-    example: 'New York, USA',
+  @ApiPropertyOptional({
+    description: 'Binary file when using multipart (field name: avatar)',
+    type: 'string',
+    format: 'binary',
   })
-  address?: string;
-
   @IsOptional()
-  @ApiProperty({
-    description: 'Gender',
-    example: 'male',
-  })
-  gender?: string;
-
-  @IsOptional()
-  @ApiProperty({
-    description: 'Date of birth',
-    example: '14/11/2001',
-  })
-  date_of_birth?: string;
+  avatar?: Express.Multer.File;
 }
