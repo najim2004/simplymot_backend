@@ -1,7 +1,4 @@
-import axios, {
-  AxiosProxyConfig,
-  AxiosResponse,
-} from 'axios';
+import axios, { AxiosProxyConfig, AxiosResponse } from 'axios';
 import appConfig from '../../../config/app.config';
 import {
   NotFoundException,
@@ -316,7 +313,10 @@ export class DvlaService {
       console.log('========== [TOKEN REFRESH ERROR] ==========');
       console.log('Source: ensureValidMotToken()');
       console.log('Status:', error?.response?.status);
-      console.log('Response Data:', JSON.stringify(error?.response?.data, null, 2));
+      console.log(
+        'Response Data:',
+        JSON.stringify(error?.response?.data, null, 2),
+      );
       console.log('Message:', error?.message);
       console.log('Full Error:', error);
       console.log('===========================================');
@@ -362,9 +362,14 @@ export class DvlaService {
     operation: string,
   ): never {
     console.log('========== [DVLA API ERROR] ==========');
-    console.log(`Source: handleDvlaApiError() | Reg: ${registrationNumber} | Op: ${operation}`);
+    console.log(
+      `Source: handleDvlaApiError() | Reg: ${registrationNumber} | Op: ${operation}`,
+    );
     console.log('Status:', error?.response?.status);
-    console.log('Response Data:', JSON.stringify(error?.response?.data, null, 2));
+    console.log(
+      'Response Data:',
+      JSON.stringify(error?.response?.data, null, 2),
+    );
     console.log('Message:', error?.message);
     console.log('Full Error:', error);
     console.log('======================================');
@@ -417,9 +422,14 @@ export class DvlaService {
     operation: string,
   ): never {
     console.log('========== [MOT API ERROR] ==========');
-    console.log(`Source: handleMotApiError() | Reg: ${registrationNumber} | Op: ${operation}`);
+    console.log(
+      `Source: handleMotApiError() | Reg: ${registrationNumber} | Op: ${operation}`,
+    );
     console.log('Status:', error?.response?.status);
-    console.log('Response Data:', JSON.stringify(error?.response?.data, null, 2));
+    console.log(
+      'Response Data:',
+      JSON.stringify(error?.response?.data, null, 2),
+    );
     console.log('Message:', error?.message);
     console.log('Full Error:', error);
     console.log('=====================================');

@@ -59,6 +59,7 @@ export default () => ({
     user: process.env.MAIL_USERNAME,
     password: process.env.MAIL_PASSWORD,
     from: process.env.MAIL_FROM_ADDRESS,
+    from_name: process.env.MAIL_FROM_NAME,
   },
 
   auth: {
@@ -104,5 +105,16 @@ export default () => ({
       email: process.env.SYSTEM_EMAIL,
       password: process.env.SYSTEM_PASSWORD,
     },
+  },
+
+  dvla: {
+    api_key: process.env.DVLA_API_KEY,
+    /** Optional HTTP(S) proxy for DVLA vehicle + MOT API outbound calls, e.g. http://user:pass@host:8080 */
+    proxy_url: process.env.DVLA_PROXY_URL,
+  },
+  mot: {
+    client_id: process.env.MOT_CLIENT_ID,
+    client_secret: process.env.MOT_CLIENT_SECRET,
+    api_key: process.env.MOT_API_KEY,
   },
 });

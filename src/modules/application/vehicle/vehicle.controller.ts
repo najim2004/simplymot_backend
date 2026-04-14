@@ -1,15 +1,27 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { VehicleService } from './vehicle.service';
-import { CreateVehicleDto } from './dto/create-vehicle.dto';
+import { AddVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { User } from 'src/modules/auth/decorators/get-user.decorator';
 
 @Controller('vehicle')
 export class VehicleController {
   constructor(private readonly vehicleService: VehicleService) {}
 
   @Post()
-  create(@Body() createVehicleDto: CreateVehicleDto) {
-    return this.vehicleService.create(createVehicleDto);
+  addVehicle(
+    @Body() addVehicleDto: AddVehicleDto,
+    @User('id') user_id: string,
+  ) {
+    return this.vehicleService.addVehicle(addVehicleDto, user_id);
   }
 
   @Get()

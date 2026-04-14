@@ -419,7 +419,7 @@ export class GarageService {
       },
 
       include: {
-        scheduleIntervals: true,
+        schedule_intervals: true,
       },
     });
     if (!schedule) {
