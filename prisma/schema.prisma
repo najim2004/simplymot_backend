@@ -181,9 +181,9 @@ model Garage {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  owner_id    String
-  avatar      String?
-  garage_name String? @db.VarChar(255)
+  owner_id     String
+  garage_image String?
+  garage_name  String? @db.VarChar(255)
 
   contact_email String? @unique
   phone_number  String?
@@ -225,18 +225,13 @@ model Schedule {
 
   garage_id String @unique
 
-  slot_duration Int?    @default(60) // minutes
-  restrictions  Json    @default("[]") // Array of restriction objects
-  daily_hours   Json? // Optional per-day hours config: { "0": { is_closed?: boolean, intervals?: [{ start_time, end_time }], slot_duration?: number }, ... }
-  is_active     Boolean @default(true)
-
   // Relations
   // time_slots TimeSlot[]
-  holidays          Holiday[]
-  breakTimes        BreakTime[]
-  timeSlots         TimeSlot[]
-  garage            Garage             @relation(fields: [garage_id], references: [id], onDelete: Cascade)
-  scheduleIntervals ScheduleInterval[]
+  holidays           Holiday[]
+  breakTimes         BreakTime[]
+  timeSlots          TimeSlot[]
+  garage             Garage             @relation(fields: [garage_id], references: [id], onDelete: Cascade)
+  schedule_intervals ScheduleInterval[]
 
   @@map("schedules")
 }

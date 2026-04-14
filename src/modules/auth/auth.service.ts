@@ -31,7 +31,11 @@ import {
   VerifyEmailDto,
   CheckOTPValidationDto,
 } from './dto/auth.dto';
-import { UserAccountStatus, UserKind } from 'prisma/generated/enums';
+import {
+  SubscriptionStatus,
+  UserAccountStatus,
+  UserKind,
+} from 'prisma/generated/enums';
 import { Prisma } from 'prisma/generated/client';
 
 @Injectable()
@@ -100,6 +104,70 @@ export class AuthService {
       );
     }
 
+    let userRoles = [];
+
+    if (user.kind == UserKind.ADMIN) {
+      const roleUsers = await this.prisma.roleUser.findMany({
+        where: {
+          user_id: id,
+        },
+        select: {
+          role: {
+            select: {
+              id: true,
+              title: true,
+              name: true,
+              permission_roles: {
+                select: {
+                  permission: {
+                    select: {
+                      id: true,
+                      title: true,
+                      action: true,
+                      subject: true,
+                      conditions: true,
+                      fields: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      userRoles = roleUsers.map((roleUser) => {
+        return {
+          id: roleUser.role.id,
+          title: roleUser.role.title,
+          name: roleUser.role.name,
+          permissions: roleUser.role.permission_roles.map((permissionRole) => {
+            return {
+              id: permissionRole.permission.id,
+              title: permissionRole.permission.title,
+              action: permissionRole.permission.action,
+              subject: permissionRole.permission.subject,
+              conditions: permissionRole.permission.conditions,
+              fields: permissionRole.permission.fields,
+            };
+          }),
+        };
+      });
+    }
+
+    if (user.kind == UserKind.GARAGE) {
+      const subscription = await this.prisma.subscription.findFirst({
+        where: {
+          user_id: id,
+          status: SubscriptionStatus.ACTIVE,
+        },
+        select: {
+          id: true,
+          status: true,
+        },
+      });
+    }
+
     await this.redis.set(
       cacheKey,
       JSON.stringify(user),
@@ -141,11 +209,10 @@ export class AuthService {
       }
 
       // upload file
-      const fileName = `${StringHelper.randomString()}${avatar.originalname}`;
-      await SojebStorage.put(
-        appConfig().storageUrl.avatar + fileName,
-        avatar.buffer,
-      );
+      const fileName =
+        appConfig().storageUrl.avatar +
+        `/${StringHelper.randomString()}${avatar.originalname}`;
+      await SojebStorage.put(fileName, avatar.buffer);
 
       data.avatar = fileName;
     }

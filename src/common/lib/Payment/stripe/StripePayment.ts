@@ -2,8 +2,6 @@ import stripe from 'stripe';
 import * as fs from 'fs';
 import appConfig from '../../../../config/app.config';
 import { Fetch } from '../../Fetch';
-import * as dotenv from 'dotenv';
-dotenv.config();
 
 const STRIPE_SECRET_KEY = appConfig().payment.stripe.secret_key;
 
@@ -105,6 +103,30 @@ export class StripePayment {
   }
 
   /**
+   * Update customer metadata for ban/unban status management
+   * @param customer_id - Stripe customer ID
+   * @param metadata - Metadata to update
+   * @returns Updated customer object
+   */
+  static async updateCustomerMetadata({
+    customer_id,
+    metadata,
+  }: {
+    customer_id: string;
+    metadata: stripe.MetadataParam;
+  }): Promise<stripe.Customer> {
+    try {
+      const customer = await Stripe.customers.update(customer_id, {
+        metadata: metadata,
+      });
+      return customer;
+    } catch (error) {
+      //console.error('Error updating customer metadata:', error);
+      throw new Error('Failed to update customer metadata: ' + error.message);
+    }
+  }
+
+  /**
    * Get customer using id
    * @param id
    * @returns
@@ -112,6 +134,44 @@ export class StripePayment {
   static async getCustomerByID(id: string): Promise<stripe.Customer> {
     const customer = await Stripe.customers.retrieve(id);
     return customer as stripe.Customer;
+  }
+
+  /**
+   * Get active subscriptions for a customer
+   * @param customer_id - Stripe customer ID
+   * @returns Array of active subscriptions
+   */
+  static async getActiveSubscriptions(
+    customer_id: string,
+  ): Promise<stripe.Subscription[]> {
+    try {
+      const subscriptions = await Stripe.subscriptions.list({
+        customer: customer_id,
+        status: 'active',
+        limit: 100, // Get up to 100 active subscriptions
+      });
+      return subscriptions.data;
+    } catch (error) {
+      //console.error('Error fetching active subscriptions:', error);
+      throw new Error('Failed to fetch active subscriptions: ' + error.message);
+    }
+  }
+
+  /**
+   * Validate if customer exists in Stripe
+   * @param customerId
+   * @returns
+   */
+  static async validateCustomer(customerId: string): Promise<boolean> {
+    try {
+      await Stripe.customers.retrieve(customerId);
+      return true;
+    } catch (error) {
+      if (error.code === 'resource_missing') {
+        return false;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -185,16 +245,21 @@ export class StripePayment {
    * Create stripe hosted checkout session
    * @param customer
    * @param price
+   * @param trial_period_days - Optional trial period in days (0 = no trial)
    * @returns
    */
   static async createCheckoutSessionSubscription(
     customer: string,
     price: string,
+    trial_period_days?: number,
   ) {
     const success_url = `${
       appConfig().app.url
     }/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancel_url = `${appConfig().app.url}/failed`;
+
+    // Use provided trial period or default to 0 days (no environment fallback)
+    const trialDays = trial_period_days !== undefined ? trial_period_days : 0;
 
     const session = await Stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -207,11 +272,64 @@ export class StripePayment {
         },
       ],
       subscription_data: {
-        trial_period_days: 14,
+        ...(trialDays > 0 && { trial_period_days: trialDays }),
       },
       success_url: success_url,
       cancel_url: cancel_url,
       // automatic_tax: { enabled: true },
+    });
+    return session;
+  }
+
+  /**
+   * Create stripe hosted checkout session with metadata for garage subscriptions
+   * @param customer
+   * @param price
+   * @param metadata
+   * @param success_url
+   * @param cancel_url
+   * @param trial_period_days - Optional trial period in days (0 = no trial)
+   * @returns
+   */
+  static async createCheckoutSessionSubscriptionWithMetadata({
+    customer,
+    price,
+    metadata,
+    success_url,
+    cancel_url,
+    trial_period_days,
+  }: {
+    customer: string;
+    price: string;
+    metadata: stripe.MetadataParam;
+    success_url?: string;
+    cancel_url?: string;
+    trial_period_days?: number;
+  }) {
+    const defaultSuccessUrl = `${
+      appConfig().app.url
+    }/success?session_id={CHECKOUT_SESSION_ID}`;
+    const defaultCancelUrl = `${appConfig().app.url}/failed`;
+
+    // Use provided trial period or default to 0 days (no environment fallback)
+    const trialDays = trial_period_days !== undefined ? trial_period_days : 0;
+
+    const session = await Stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      customer: customer,
+      line_items: [
+        {
+          price: price,
+          quantity: 1,
+        },
+      ],
+      subscription_data: {
+        ...(trialDays > 0 && { trial_period_days: trialDays }),
+        metadata: metadata,
+      },
+      success_url: success_url || defaultSuccessUrl,
+      cancel_url: cancel_url || defaultCancelUrl,
     });
     return session;
   }
@@ -454,12 +572,159 @@ export class StripePayment {
   }
   // end ACH
 
+  // Create or reuse a Stripe Product
+  static async createProduct({
+    name,
+    active,
+  }: {
+    name: string;
+    active: boolean;
+  }): Promise<stripe.Product> {
+    // Stripe has no product-by-name fetch API; create a new product each sync
+    // If you want idempotency per name, you can store product_id in DB later.
+    const product = await Stripe.products.create({
+      name,
+      active,
+    });
+    return product;
+  }
+
+  // Create a recurring Price for a product
+  static async createPrice({
+    unit_amount,
+    currency,
+    product,
+    recurring_interval,
+    metadata,
+  }: {
+    unit_amount: number; // in minor units (pence)
+    currency: string; // e.g. GBP
+    product: string; // product id
+    recurring_interval: 'day' | 'week' | 'month' | 'year';
+    metadata?: stripe.MetadataParam;
+  }): Promise<stripe.Price> {
+    const price = await Stripe.prices.create({
+      unit_amount,
+      currency: currency.toLowerCase(),
+      recurring: { interval: recurring_interval },
+      product,
+      metadata,
+    });
+    return price;
+  }
+
+  // Create a Subscription for a customer and a price
+  static async createSubscription({
+    customer,
+    price,
+    metadata,
+  }: {
+    customer: string; // stripe customer id
+    price: string; // stripe price id
+    metadata?: stripe.MetadataParam;
+  }): Promise<stripe.Subscription> {
+    const subscription = await Stripe.subscriptions.create({
+      customer,
+      items: [{ price }],
+      expand: ['latest_invoice.payment_intent'],
+      metadata,
+    });
+    return subscription;
+  }
+
+  // Cancel a Subscription
+  static async cancelSubscription(
+    subscription_id: string,
+  ): Promise<stripe.Subscription> {
+    const cancelled = await Stripe.subscriptions.cancel(subscription_id);
+    return cancelled;
+  }
+
+  // Cancel subscription at period end
+  static async cancelSubscriptionAtPeriodEnd(
+    subscription_id: string,
+  ): Promise<stripe.Subscription> {
+    const cancelled = await Stripe.subscriptions.update(subscription_id, {
+      cancel_at_period_end: true,
+    });
+    return cancelled;
+  }
+
+  // Update an existing subscription to use a new price
+  static async updateSubscriptionPrice(
+    subscription_id: string,
+    new_price_id: string,
+  ): Promise<stripe.Subscription> {
+    // Retrieve current subscription to get item ids
+    const current = await Stripe.subscriptions.retrieve(subscription_id, {
+      expand: ['items.data.price'],
+    });
+
+    const primaryItem = (current as any).items?.data?.[0];
+    if (!primaryItem?.id) {
+      throw new Error('Subscription has no items to update');
+    }
+
+    return await Stripe.subscriptions.update(subscription_id, {
+      items: [
+        {
+          id: primaryItem.id,
+          price: new_price_id,
+        },
+      ],
+      expand: ['latest_invoice.payment_intent'],
+      proration_behavior: 'create_prorations',
+    });
+  }
+
   static handleWebhook(rawBody: string, sig: string | string[]): stripe.Event {
-    const event = Stripe.webhooks.constructEvent(
-      rawBody,
-      sig,
-      STRIPE_WEBHOOK_SECRET,
-    );
-    return event;
+    try {
+      const event = Stripe.webhooks.constructEvent(
+        rawBody,
+        sig,
+        STRIPE_WEBHOOK_SECRET,
+      );
+      return event;
+    } catch (err) {
+      //console.error('Webhook signature verification failed:', err.message);
+      throw new Error('Invalid webhook signature');
+    }
+  }
+
+  /**
+   * Retrieve a checkout session from Stripe
+   * @param sessionId - The checkout session ID
+   * @returns The checkout session object
+   */
+  static async retrieveCheckoutSession(
+    sessionId: string,
+  ): Promise<stripe.Checkout.Session> {
+    try {
+      const session = await Stripe.checkout.sessions.retrieve(sessionId);
+      return session;
+    } catch (error) {
+      //console.error(`Failed to retrieve checkout session ${sessionId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieve a subscription from Stripe
+   * @param subscriptionId - The subscription ID
+   * @returns The subscription object
+   */
+  static async retrieveSubscription(
+    subscriptionId: string,
+  ): Promise<stripe.Subscription> {
+    try {
+      const subscription = await Stripe.subscriptions.retrieve(subscriptionId);
+      return subscription;
+    } catch (error) {
+      //console.error(
+      //  `Failed to retrieve subscription ${subscriptionId}:`,
+      //  error,
+      //);
+      throw error;
+    }
   }
 }
