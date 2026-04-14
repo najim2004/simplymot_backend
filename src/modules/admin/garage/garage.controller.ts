@@ -1,34 +1,30 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { GarageService } from './garage.service';
-import { CreateGarageDto } from './dto/create-garage.dto';
-import { UpdateGarageDto } from './dto/update-garage.dto';
+import { QueryGarageDto } from './dto/query-garage.dto';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guard/role/roles.guard';
+import { Roles } from 'src/common/guard/role/roles.decorator';
+import { Role } from 'src/common/guard/role/role.enum';
 
-@Controller('garage')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
+@Controller('admin/garage')
 export class GarageController {
   constructor(private readonly garageService: GarageService) {}
 
-  @Post()
-  create(@Body() createGarageDto: CreateGarageDto) {
-    return this.garageService.create(createGarageDto);
-  }
-
   @Get()
-  findAll() {
-    return this.garageService.findAll();
+  getAllGarages(@Query() query: QueryGarageDto) {
+    return this.garageService.getAllGarages(query);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.garageService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateGarageDto: UpdateGarageDto) {
-    return this.garageService.update(+id, updateGarageDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.garageService.remove(+id);
+  getGarageDetails(@Param('id') id: string) {
+    return this.garageService.getGarageDetails(id);
   }
 }

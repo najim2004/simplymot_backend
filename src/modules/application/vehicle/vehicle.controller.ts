@@ -3,14 +3,15 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { VehicleService } from './vehicle.service';
 import { AddVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { User } from 'src/modules/auth/decorators/get-user.decorator';
+import { QueryMotHistoryDto } from './dto/query-vehicle.dto';
 
 @Controller('vehicle')
 export class VehicleController {
@@ -23,24 +24,25 @@ export class VehicleController {
   ) {
     return this.vehicleService.addVehicle(addVehicleDto, user_id);
   }
-
   @Get()
-  findAll() {
-    return this.vehicleService.findAll();
+  getAllVehicles(@User('id') user_id: string) {
+    return this.vehicleService.getAllVehicles(user_id);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.vehicleService.findOne(+id);
+  @Get(':id/mot-history')
+  getAllMothHistoryOfAVehicle(
+    @Param('id') vehicle_id: string,
+    @Query() queryMotHistoryDto: QueryMotHistoryDto,
+    @User('id') user_id: string,
+  ) {
+    return this.vehicleService.getAllMothHistoryOfAVehicle(
+      vehicle_id,
+      queryMotHistoryDto,
+      user_id,
+    );
   }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateVehicleDto: UpdateVehicleDto) {
-    return this.vehicleService.update(+id, updateVehicleDto);
-  }
-
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.vehicleService.remove(+id);
+  deleteVehicle(@Param('id') vehicle_id: string, @User('id') user_id: string) {
+    return this.vehicleService.deleteVehicle(vehicle_id, user_id);
   }
 }

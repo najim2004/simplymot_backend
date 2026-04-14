@@ -1,34 +1,35 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { VehicleService } from './vehicle.service';
-import { CreateVehicleDto } from './dto/create-vehicle.dto';
-import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import {
+  QueryVehicleDto,
+  QueryVehicleHistoryDto,
+} from './dto/query-vehicle.dto';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guard/role/roles.guard';
+import { Roles } from 'src/common/guard/role/roles.decorator';
+import { Role } from 'src/common/guard/role/role.enum';
 
-@Controller('vehicle')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
+@Controller('admin/vehicle')
 export class VehicleController {
   constructor(private readonly vehicleService: VehicleService) {}
 
-  @Post()
-  create(@Body() createVehicleDto: CreateVehicleDto) {
-    return this.vehicleService.create(createVehicleDto);
-  }
-
   @Get()
-  findAll() {
-    return this.vehicleService.findAll();
+  getAllVehicles(@Query() query: QueryVehicleDto) {
+    return this.vehicleService.getAllVehicles(query);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.vehicleService.findOne(+id);
+  getVehicleById(@Param('id') id: string) {
+    return this.vehicleService.getVehicleById(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateVehicleDto: UpdateVehicleDto) {
-    return this.vehicleService.update(+id, updateVehicleDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.vehicleService.remove(+id);
+  @Get(':id/history')
+  getVehicleHistory(
+    @Param('id') vehicle_id: string,
+    @Query() query: QueryVehicleHistoryDto,
+  ) {
+    return this.vehicleService.getVehicleHistory(vehicle_id, query);
   }
 }

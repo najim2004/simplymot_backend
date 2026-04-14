@@ -142,11 +142,11 @@ model User {
 
   phone_number String?
 
-  country  String?
-  state    String?
-  city     String?
-  address  String?
-  zip_code String?
+  country   String?
+  state     String?
+  city      String?
+  address   String?
+  post_code String?
 
   // billing id. e.g. stripe customer id
   billing_id String?
@@ -194,7 +194,7 @@ model Garage {
   state     String?
   city      String?
   address   String?
-  zip_code  String?
+  post_code String?
   latitude  Float?
   longitude Float?
 
