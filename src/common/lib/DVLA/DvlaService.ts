@@ -111,19 +111,22 @@ export class DvlaService {
     registrationNumber: string,
   ): Promise<DvlaVehicleResponse> {
     try {
+      const normalizedRegistration =
+        this.normalizeRegistrationNumber(registrationNumber);
+
       // this.logger.log(
       //   `Fetching vehicle details for registration: ${registrationNumber}`,
       // );
 
       // Validate registration number format
-      if (!this.isValidRegistrationNumber(registrationNumber)) {
+      if (!this.isValidRegistrationNumber(normalizedRegistration)) {
         throw new BadRequestException('Invalid registration number format');
       }
 
       const proxy = this.getOutboundProxyConfig();
       const response: AxiosResponse<DvlaVehicleResponse> = await axios.post(
         this.DVLA_VEHICLE_URL,
-        { registrationNumber: registrationNumber.toUpperCase() },
+        { registrationNumber: normalizedRegistration },
         {
           headers: {
             'x-api-key': this.DVLA_API_KEY,
@@ -135,7 +138,7 @@ export class DvlaService {
       );
 
       this.logger.log(
-        `Successfully retrieved vehicle details for: ${registrationNumber}`,
+        `Successfully retrieved vehicle details for: ${normalizedRegistration}`,
       );
       return response.data;
     } catch (error) {
@@ -155,12 +158,15 @@ export class DvlaService {
     registrationNumber: string,
   ): Promise<MotHistoryResponse> {
     try {
+      const normalizedRegistration =
+        this.normalizeRegistrationNumber(registrationNumber);
+
       this.logger.log(
-        `Fetching MOT history for registration: ${registrationNumber}`,
+        `Fetching MOT history for registration: ${normalizedRegistration}`,
       );
 
       // Validate registration number format
-      if (!this.isValidRegistrationNumber(registrationNumber)) {
+      if (!this.isValidRegistrationNumber(normalizedRegistration)) {
         throw new BadRequestException('Invalid registration number format');
       }
 
@@ -174,7 +180,7 @@ export class DvlaService {
 
       const proxy = this.getOutboundProxyConfig();
       const response: AxiosResponse<MotHistoryResponse> = await axios.get(
-        `${this.MOT_API_BASE_URL}/${registrationNumber.toUpperCase()}`,
+        `${this.MOT_API_BASE_URL}/${normalizedRegistration}`,
         {
           headers: {
             // MOTH API V3 QuickStart: Authorization + X-API-Key (required).
@@ -201,7 +207,7 @@ export class DvlaService {
       // console.log(response.data);
 
       this.logger.log(
-        `Successfully retrieved MOT history for: ${registrationNumber}`,
+        `Successfully retrieved MOT history for: ${normalizedRegistration}`,
       );
       return response.data;
     } catch (error) {
@@ -219,19 +225,22 @@ export class DvlaService {
     registrationNumber: string,
   ): Promise<CombinedVehicleData> {
     try {
+      const normalizedRegistration =
+        this.normalizeRegistrationNumber(registrationNumber);
+
       this.logger.log(
-        `Fetching complete vehicle data for: ${registrationNumber}`,
+        `Fetching complete vehicle data for: ${normalizedRegistration}`,
       );
 
       // Fetch data from both APIs concurrently for better performance
       const [dvlaData, motData] = await Promise.allSettled([
-        this.getVehicleDetails(registrationNumber),
-        this.getMotHistory(registrationNumber),
+        this.getVehicleDetails(normalizedRegistration),
+        this.getMotHistory(normalizedRegistration),
       ]);
 
       // Combine data from both sources
       const combinedData: CombinedVehicleData = {
-        registrationNumber: registrationNumber.toUpperCase(),
+        registrationNumber: normalizedRegistration,
         dvlaData: dvlaData.status === 'fulfilled' ? dvlaData.value : null,
         motData: motData.status === 'fulfilled' ? motData.value : null,
         lastUpdated: new Date(),
@@ -239,18 +248,18 @@ export class DvlaService {
 
       // Log success/failure for each API
       if (dvlaData.status === 'fulfilled') {
-        this.logger.log(`DVLA API: Success for ${registrationNumber}`);
+        this.logger.log(`DVLA API: Success for ${normalizedRegistration}`);
       } else {
         this.logger.warn(
-          `DVLA API: Failed for ${registrationNumber} - ${dvlaData.reason}`,
+          `DVLA API: Failed for ${normalizedRegistration} - ${dvlaData.reason}`,
         );
       }
 
       if (motData.status === 'fulfilled') {
-        this.logger.log(`MOT API: Success for ${registrationNumber}`);
+        this.logger.log(`MOT API: Success for ${normalizedRegistration}`);
       } else {
         this.logger.warn(
-          `MOT API: Failed for ${registrationNumber} - ${motData.reason}`,
+          `MOT API: Failed for ${normalizedRegistration} - ${motData.reason}`,
         );
       }
 
@@ -260,7 +269,7 @@ export class DvlaService {
       }
 
       this.logger.log(
-        `Complete vehicle data retrieved for: ${registrationNumber}`,
+        `Complete vehicle data retrieved for: ${normalizedRegistration}`,
       );
       return combinedData;
     } catch (error) {
@@ -332,6 +341,17 @@ export class DvlaService {
    * @param registrationNumber - Registration number to validate
    * @returns boolean - True if format is valid
    */
+  private static normalizeRegistrationNumber(
+    registrationNumber: string,
+  ): string {
+    if (!registrationNumber || typeof registrationNumber !== 'string') {
+      return '';
+    }
+
+    // DVLA expects no spaces. Keep only letters and numbers for consistent lookups.
+    return registrationNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  }
+
   private static isValidRegistrationNumber(
     registrationNumber: string,
   ): boolean {
@@ -339,17 +359,15 @@ export class DvlaService {
       return false;
     }
 
-    // Remove spaces and convert to uppercase
-    const cleanReg = registrationNumber.replace(/\s/g, '').toUpperCase();
-
-    // Basic UK registration format validation
-    // Supports formats like: AB12CDE, A123BCD, AB123CD, etc.
-    const ukRegPattern = /^[A-Z]{1,3}[0-9]{1,4}[A-Z]{1,3}$/;
+    // Support private/cherished plates by allowing alphanumeric registrations,
+    // not only standard modern UK patterns.
+    const cleanReg = this.normalizeRegistrationNumber(registrationNumber);
+    const genericUkRegPattern = /^[A-Z0-9]+$/;
 
     return (
-      ukRegPattern.test(cleanReg) &&
-      cleanReg.length >= 5 &&
-      cleanReg.length <= 8
+      genericUkRegPattern.test(cleanReg) &&
+      cleanReg.length >= 1 &&
+      cleanReg.length <= 10
     );
   }
 

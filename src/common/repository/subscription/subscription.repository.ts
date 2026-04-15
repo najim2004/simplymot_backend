@@ -75,6 +75,66 @@ export class SubscriptionRepository {
     return subscription as SubscriptionWithPlan;
   }
 
+  async cancelActiveSubscriptionsForUser(
+    user_id: string,
+    reason = 'User banned by admin',
+    cancelAtPeriodEnd = false,
+  ): Promise<number> {
+    const activeStatuses = [
+      'TRIALING',
+      'ACTIVE',
+      'PAST_DUE',
+      'UNPAID',
+      'PAUSED',
+      'SUSPENDED',
+    ];
+
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: {
+        user_id,
+        status: { in: activeStatuses as any },
+      },
+      select: {
+        id: true,
+        stripe_subscription_id: true,
+      },
+    });
+
+    if (!subscriptions.length) return 0;
+
+    for (const subscription of subscriptions) {
+      if (subscription.stripe_subscription_id) {
+        try {
+          if (cancelAtPeriodEnd) {
+            await StripePayment.cancelSubscriptionAtPeriodEnd(
+              subscription.stripe_subscription_id,
+            );
+          } else {
+            await StripePayment.cancelSubscription(subscription.stripe_subscription_id);
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Stripe cancel failed for sub ${subscription.id}: ${error.message}`,
+          );
+        }
+      }
+    }
+
+    await this.prisma.subscription.updateMany({
+      where: {
+        id: { in: subscriptions.map((item) => item.id) },
+      },
+      data: {
+        status: cancelAtPeriodEnd ? ('ACTIVE' as any) : ('CANCELLED' as any),
+        cancel_at: cancelAtPeriodEnd ? null : new Date(),
+        cancel_at_period_end: cancelAtPeriodEnd,
+        cancellation_reason: reason,
+      },
+    });
+
+    return subscriptions.length;
+  }
+
   // Pulls latest billing period dates from Stripe and persists them locally
   async syncSubscription(
     user_id: string,
