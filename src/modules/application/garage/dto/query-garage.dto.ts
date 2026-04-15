@@ -10,3 +10,4 @@ export class GetGarageHolidaysQueryDto {
   @IsOptional()
   year?: string;
 }
+// export

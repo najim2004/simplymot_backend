@@ -13,6 +13,14 @@ export class QueryBookingDto {
   @IsOptional()
   @IsString()
   @ApiProperty({
+    description: 'customer id or garage id',
+    example: 'cuid',
+  })
+  id?: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({
     description: 'Search',
     example: 'John Doe',
   })

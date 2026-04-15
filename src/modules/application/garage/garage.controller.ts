@@ -32,8 +32,12 @@ export class GarageController {
     return this.garageService.getGarage(id);
   }
 
-  // ---------------- SCHEDULE ----------------
+  @Get('search')
+  searchGarage(@Query() query: QueryGarageDto) {
+    return this.garageService.searchGarage(query);
+  }
 
+  // ---------------- SCHEDULE ----------------
   @Get(':garage_id/schedule')
   getSchedule(
     @Param('garage_id') garage_id: string,

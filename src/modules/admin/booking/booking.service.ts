@@ -10,11 +10,12 @@ export class BookingService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAllBookings(query: QueryBookingDto) {
-    const { search, from_date, to_date, page, limit, status } = query;
+    const { search, from_date, to_date, page, limit, status, id } = query;
     const where: Prisma.BookingWhereInput = {
       ...(from_date && { order_date: { gte: from_date } }),
       ...(to_date && { order_date: { lte: to_date } }),
       ...(status && { status: status }),
+      ...(id && { OR: [{ customer_id: id }, { garage_id: id }] }),
     };
     if (search) {
       where.OR = [
