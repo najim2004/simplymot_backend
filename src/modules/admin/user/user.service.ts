@@ -484,17 +484,74 @@ export class UserService {
     });
   }
 
-  async removeUser(id: string) {
-    const user = await this.userRepository.deleteUser(id);
-    if (!user.success) {
-      if (user.message === 'User not found') {
-        throw new NotFoundException(user.message);
-      }
-      throw new BadRequestException(user.message);
+  async deleteUser(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        kind: true,
+        billing_id: true,
+        role_users: {
+          select: {
+            role: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
+
+    if (user.email === appConfig().defaultUser.system.email) {
+      throw new BadRequestException('Cannot delete system administrator');
+    }
+
+    const isSuperAdmin = user.role_users.some(
+      (roleUser) => roleUser.role.name === 'super_admin',
+    );
+    if (isSuperAdmin) {
+      throw new BadRequestException('Cannot delete Super Admin user');
+    }
+
+    const [vehicleCount, serviceCount, subscriptionCount] = await Promise.all([
+      this.prisma.vehicle.count({ where: { user_id: id } }),
+      this.prisma.service.count({ where: { garage_id: id } }),
+      this.prisma.subscription.count({ where: { user_id: id } }),
+    ]);
+
+    await this.prisma.user.delete({ where: { id } });
+
+    this.logger.log(
+      `Deleted user ${user.email} (${user.kind}). Vehicles: ${vehicleCount}, Services: ${serviceCount}, Subscriptions: ${subscriptionCount}`,
+    );
+
+    if (
+      user.billing_id &&
+      (user.kind === UserKind.DRIVER || user.kind === UserKind.GARAGE)
+    ) {
+      this.logger.log(
+        `Deleted user ${user.email} had Stripe customer ${user.billing_id}. Customer remains in Stripe.`,
+      );
+    }
+
     return ResponseHelper.success({
-      message: user.message || 'User removed successfully',
-      data: null,
+      message: 'User deleted permanently',
+      data: {
+        user_id: user.id,
+        email: user.email,
+        name: user.name,
+        kind: user.kind,
+        deleted_at: new Date(),
+        deleted_records: {
+          vehicles: vehicleCount,
+          services: serviceCount,
+          subscriptions: subscriptionCount,
+        },
+        stripe_customer_id: user.billing_id || null,
+      },
     });
   }
 
