@@ -600,17 +600,75 @@ export class StripePayment {
     unit_amount: number; // in minor units (pence)
     currency: string; // e.g. GBP
     product: string; // product id
-    recurring_interval: 'day' | 'week' | 'month' | 'year';
+    recurring_interval: 'DAY' | 'WEEK' | 'MONTH' | 'YEAR';
     metadata?: stripe.MetadataParam;
   }): Promise<stripe.Price> {
     const price = await Stripe.prices.create({
       unit_amount,
       currency: currency.toLowerCase(),
-      recurring: { interval: recurring_interval },
+      recurring: {
+        interval:
+          recurring_interval?.toLowerCase() as stripe.Price.Recurring.Interval,
+      },
       product,
       metadata,
     });
     return price;
+  }
+
+  // Deactivate an existing Stripe Price (Stripe prices are immutable)
+  static async deactivatePrice(price_id: string): Promise<stripe.Price> {
+    return Stripe.prices.update(price_id, { active: false });
+  }
+
+  // Deactivate an existing Stripe Product
+  static async deactivateProduct(product_id: string): Promise<stripe.Product> {
+    return Stripe.products.update(product_id, { active: false });
+  }
+
+  // Update Stripe Product metadata/state for plan sync
+  static async updateProduct({
+    product_id,
+    name,
+    description,
+    active,
+  }: {
+    product_id: string;
+    name?: string;
+    description?: string | null;
+    active?: boolean;
+  }): Promise<stripe.Product> {
+    const payload: stripe.ProductUpdateParams = {};
+
+    if (name !== undefined) {
+      payload.name = name;
+    }
+    if (description !== undefined) {
+      payload.description = description;
+    }
+    if (active !== undefined) {
+      payload.active = active;
+    }
+
+    return Stripe.products.update(product_id, payload);
+  }
+
+  static async retrieveProduct(product_id: string): Promise<stripe.Product> {
+    return Stripe.products.retrieve(product_id);
+  }
+
+  static async retrievePrice(price_id: string): Promise<stripe.Price> {
+    return Stripe.prices.retrieve(price_id);
+  }
+
+  static async setPriceActive({
+    price_id,
+    active,
+  }: {
+    price_id: string;
+    active: boolean;
+  }): Promise<stripe.Price> {
+    return Stripe.prices.update(price_id, { active });
   }
 
   // Create a Subscription for a customer and a price

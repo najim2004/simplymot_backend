@@ -65,6 +65,13 @@ enum SubscriptionPlanStatus {
   ARCHIVED
 }
 
+enum PeriodType {
+  DAY
+  WEEK
+  MONTH
+  YEAR
+}
+
 /// Aligns with common billing providers (e.g. Stripe subscription states).
 enum SubscriptionStatus {
   TRIALING
@@ -570,6 +577,8 @@ model SubscriptionPlan {
   status            SubscriptionPlanStatus @default(ACTIVE)
   stripe_price_id   String?
   stripe_product_id String?
+
+  period_type PeriodType @default(MONTH)
 
   // minimal flag for admin visibility/filters
   is_legacy_price   Boolean @default(false)
