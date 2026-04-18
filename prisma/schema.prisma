@@ -772,7 +772,7 @@ model PaymentTransaction {
   user    User?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
 
   entity_id String?
-  type      PaymentTransactionKind @default(SUBSCRIPTION)
+  kind      PaymentTransactionKind @default(SUBSCRIPTION)
 
   provider         String?
   reference_number String?
@@ -789,7 +789,7 @@ model PaymentTransaction {
   @@index([user_id])
   @@index([booking_id])
   @@index([status])
-  @@index([type])
+  @@index([kind])
   @@index([reference_number])
   @@index([created_at])
   @@map("payment_transactions")
