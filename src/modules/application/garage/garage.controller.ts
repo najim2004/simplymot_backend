@@ -163,6 +163,7 @@ export class GarageController {
   ) {
     return this.garageService.getSlots(garage_id, query);
   }
+
   @Patch(':garage_id/slots/block')
   blockSlots(
     @Param('garage_id') garage_id: string,
@@ -174,6 +175,7 @@ export class GarageController {
       'block',
     );
   }
+
   @Patch(':garage_id/slots/unblock')
   unblockSlots(
     @Param('garage_id') garage_id: string,
@@ -185,6 +187,7 @@ export class GarageController {
       'unblock',
     );
   }
+
   // ---------------- SERVICES ----------------
   @Get(':garage_id/services')
   getServices(
