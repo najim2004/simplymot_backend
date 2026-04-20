@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { NotificationService } from './notification.service';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '../../../common/guard/role/role.enum';
@@ -17,50 +25,31 @@ export class NotificationController {
 
   @ApiOperation({ summary: 'Get all notifications' })
   @Get()
-  async findAll(@Req() req: Request) {
-    try {
-      const user_id = req.user.userId;
+  findAll(@Req() req: Request) {
+    return this.notificationService.findAll(req.user.id);
+  }
 
-      const notification = await this.notificationService.findAll(user_id);
+  @ApiOperation({ summary: 'Mark all notifications as read' })
+  @Patch('all/mark')
+  markAll(@Req() req: Request) {
+    return this.notificationService.markAll(req.user.id);
+  }
 
-      return notification;
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
+  @ApiOperation({ summary: 'Mark notification as read' })
+  @Patch(':id/mark')
+  markOne(@Req() req: Request, @Param('id') id: string) {
+    return this.notificationService.markOne(id, req.user.id);
   }
 
   @ApiOperation({ summary: 'Delete notification' })
   @Delete(':id')
-  async remove(@Req() req: Request, @Param('id') id: string) {
-    try {
-      const user_id = req.user.userId;
-      const notification = await this.notificationService.remove(id, user_id);
-
-      return notification;
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
+  remove(@Req() req: Request, @Param('id') id: string) {
+    return this.notificationService.remove(id, req.user.id);
   }
 
   @ApiOperation({ summary: 'Delete all notifications' })
   @Delete()
-  async removeAll(@Req() req: Request) {
-    try {
-      const user_id = req.user.userId;
-      const notification = await this.notificationService.removeAll(user_id);
-
-      return notification;
-    } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-      };
-    }
+  removeAll(@Req() req: Request) {
+    return this.notificationService.removeAll(req.user.id);
   }
 }

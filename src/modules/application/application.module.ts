@@ -6,8 +6,18 @@ import { SubscriptionModule } from './subscription/subscription.module';
 import { GarageModule } from './garage/garage.module';
 import { BookingModule } from './booking/booking.module';
 import { VehicleModule } from './vehicle/vehicle.module';
+import { InvoiceModule } from './invoice/invoice.module';
 
 @Module({
-  imports: [NotificationModule, ContactModule, FaqModule, SubscriptionModule, GarageModule, BookingModule, VehicleModule],
+  imports: [
+    NotificationModule,
+    ContactModule,
+    FaqModule,
+    SubscriptionModule,
+    GarageModule,
+    BookingModule,
+    VehicleModule,
+    InvoiceModule,
+  ],
 })
 export class ApplicationModule {}
