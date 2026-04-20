@@ -10,6 +10,7 @@ import {
   Put,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { GarageService } from './garage.service';
 import {
@@ -23,9 +24,11 @@ import { memoryStorage } from 'multer';
 import { CreateBreakTimeDto, CreateHolidayDto } from './dto/create-garage.dto';
 import {
   BlockUnblockSlotsDto,
+  DiscoverGarageQueryDto,
   GetGarageHolidaysQueryDto,
   GetGarageSlotsQueryDto,
 } from './dto/query-garage.dto';
+import { OptionalJwtAuthGuard } from 'src/modules/auth/guards/optional-jwt-auth.guard';
 
 @Controller('garage')
 export class GarageController {
@@ -36,9 +39,13 @@ export class GarageController {
     return this.garageService.getGarage(id);
   }
 
-  @Get('search')
-  searchGarage(@Query() query: QueryGarageDto) {
-    return this.garageService.searchGarage(query);
+  @Get('discover')
+  @UseGuards(OptionalJwtAuthGuard)
+  discoverGarages(
+    @Query() query: DiscoverGarageQueryDto,
+    @User('id') user_id?: string,
+  ) {
+    return this.garageService.discoverGarages(query, user_id);
   }
 
   // ---------------- SCHEDULE ----------------

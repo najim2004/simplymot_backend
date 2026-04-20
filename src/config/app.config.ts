@@ -117,4 +117,23 @@ export default () => ({
     client_secret: process.env.MOT_CLIENT_SECRET,
     api_key: process.env.MOT_API_KEY,
   },
+
+  /**
+   * Background jobs (BullMQ). Subscription reconciliation runs off the HTTP thread
+   * and defaults to low-traffic UK hours.
+   */
+  jobs: {
+    subscriptionReconciliation: {
+      enabled: process.env.SUBSCRIPTION_RECONCILE_ENABLED !== 'false',
+      /** Cron pattern (BullMQ repeat). Default: 03:15 Europe/London */
+      cronPattern: process.env.SUBSCRIPTION_RECONCILE_CRON || '15 3 * * *',
+      timezone: process.env.SUBSCRIPTION_RECONCILE_TZ || 'Europe/London',
+      batchSize: parseInt(process.env.SUBSCRIPTION_RECONCILE_BATCH_SIZE || '40', 10),
+      /** Parallel Stripe.retrieveSubscription calls inside one batch */
+      stripeConcurrency: parseInt(
+        process.env.SUBSCRIPTION_RECONCILE_STRIPE_CONCURRENCY || '5',
+        10,
+      ),
+    },
+  },
 });

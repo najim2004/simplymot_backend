@@ -20,8 +20,12 @@ import { Logger } from '@nestjs/common';
 import { CreateBreakTimeDto, CreateHolidayDto } from './dto/create-garage.dto';
 import {
   BlockUnblockSlotsDto,
+  DiscoverGarageQueryDto,
   GetGarageSlotsQueryDto,
+  Sort,
+  SortOrder,
 } from './dto/query-garage.dto';
+import { Prisma } from 'prisma/generated/client';
 import { SlotRepository } from 'src/common/repository/slot/slot.repository';
 
 @Injectable()
@@ -733,6 +737,108 @@ export class GarageService {
     return ResponseHelper.success({
       message: `Slot ${type === 'block' ? 'blocked' : 'unblocked'} successfully`,
       data: slot,
+    });
+  }
+
+  async discoverGarages(query: DiscoverGarageQueryDto, user_id?: string) {
+    const {
+      vehicle_registration_number,
+      post_code,
+      page = 1,
+      limit = 10,
+      sort = Sort.DISTANCE,
+      sort_order = SortOrder.ASC,
+    } = query;
+
+    const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 50);
+    const safePage = Math.max(Number(page) || 1, 1);
+    const offset = (safePage - 1) * safeLimit;
+    const normalizedPostCode = post_code.trim().toUpperCase();
+    const postCodeNoSpace = normalizedPostCode.replace(/\s+/g, '');
+    const sortDirection = sort_order === SortOrder.DESC ? 'DESC' : 'ASC';
+
+    const sortSql =
+      sort === Sort.PRICE
+        ? Prisma.sql`mot_price ${Prisma.raw(sortDirection)} NULLS LAST, g.garage_name ASC, g.id ASC`
+        : sort === Sort.RATING || sort === Sort.REVIEWS
+          ? Prisma.sql`booking_count ${Prisma.raw(sortDirection)} NULLS LAST, g.garage_name ASC, g.id ASC`
+          : Prisma.sql`g.garage_name ${Prisma.raw(sortDirection)} NULLS LAST, g.id ASC`;
+
+    const [rows, count] = await Promise.all([
+      this.prisma.$queryRaw<
+        Array<{
+          id: string;
+          garage_name: string | null;
+          address: string | null;
+          post_code: string | null;
+          vts_number: string | null;
+          phone_number: string | null;
+          garage_image: string | null;
+          mot_price: number | null;
+          booking_count: number;
+        }>
+      >(Prisma.sql`
+        SELECT
+          g.id,
+          g.garage_name,
+          g.address,
+          g.post_code,
+          g.vts_number,
+          g.phone_number,
+          g.garage_image,
+          mot.price::float8 AS mot_price,
+          (
+            SELECT COUNT(*)::int
+            FROM "bookings" b
+            WHERE b.garage_id = g.id
+          ) AS booking_count
+        FROM "garages" g
+        LEFT JOIN LATERAL (
+          SELECT s.price
+          FROM "services" s
+          WHERE s.garage_id = g.id AND s.type = 'MOT'
+          LIMIT 1
+        ) mot ON TRUE
+        WHERE regexp_replace(upper(coalesce(g.post_code, '')), '\\s+', '', 'g') = ${postCodeNoSpace}
+        ORDER BY ${sortSql}
+        LIMIT ${safeLimit}
+        OFFSET ${offset};
+      `),
+      this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS count
+        FROM "garages" g
+        WHERE regexp_replace(upper(coalesce(g.post_code, '')), '\\s+', '', 'g') = ${postCodeNoSpace};
+      `),
+    ]);
+
+    const totalCount = count[0]?.count ? Number(count[0].count) : 0;
+
+    return ResponseHelper.success({
+      message: 'Garages discovered successfully',
+      data: rows.map((row) => ({
+        id: row.id,
+        garage_name: row.garage_name || 'Unnamed Garage',
+        address: row.address || 'Address not provided',
+        post_code: row.post_code || '',
+        vts_number: row.vts_number || 'VTS not provided',
+        phone_number: row.phone_number || 'Phone not provided',
+        garage_image: row.garage_image
+          ? SojebStorage.url(row.garage_image)
+          : null,
+        mot_price: typeof row.mot_price === 'number' ? row.mot_price : null,
+        total_bookings: row.booking_count || 0,
+      })),
+      meta_data: {
+        page: safePage,
+        limit: safeLimit,
+        total: totalCount,
+        vehicle_registration_number: vehicle_registration_number?.toUpperCase(),
+        post_code: normalizedPostCode,
+        filters: {
+          sort,
+          sort_order,
+        },
+      },
     });
   }
 }

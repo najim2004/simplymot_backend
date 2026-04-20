@@ -5,7 +5,6 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { AddVehicleDto } from './dto/create-vehicle.dto';
-import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { VehicleRepository } from 'src/common/repository/vehicle/vehicle.repository';
 import { ResponseHelper } from 'src/common/helper/response.helper';
@@ -56,6 +55,23 @@ export class VehicleService {
           existOwnerVehicle,
         );
       }
+      return ResponseHelper.success({
+        data: existOwnerVehicle,
+        message: 'Vehicle added successfully',
+      });
+    } else if (!existOwnerVehicle) {
+      const newVehicle = await this.prisma.vehicle.create({
+        data: {
+          registration_number: normalizedRegistrationNumber,
+          user_id,
+        },
+      });
+      return ResponseHelper.success({
+        data: newVehicle,
+        message: 'Vehicle added successfully',
+      });
+    } else {
+      throw new InternalServerErrorException('Failed to add vehicle');
     }
   }
 

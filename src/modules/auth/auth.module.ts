@@ -9,6 +9,8 @@ import appConfig from '../../config/app.config';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { MailModule } from '../../mail/mail.module';
 import { GoogleStrategy } from './strategies/google.strategy';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 
 @Module({
   imports: [
@@ -27,7 +29,21 @@ import { GoogleStrategy } from './strategies/google.strategy';
     MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy, GoogleStrategy],
-  exports: [AuthService],
+  providers: [
+    AuthService,
+    LocalStrategy,
+    JwtStrategy,
+    GoogleStrategy,
+    JwtAuthGuard,
+    OptionalJwtAuthGuard,
+  ],
+  exports: [
+    AuthService,
+    PassportModule,
+    JwtModule,
+    JwtStrategy,
+    JwtAuthGuard,
+    OptionalJwtAuthGuard,
+  ],
 })
 export class AuthModule {}

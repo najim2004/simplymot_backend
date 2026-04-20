@@ -25,6 +25,7 @@ import { PaymentModule } from './modules/payment/payment.module';
 import { PrometheusModule } from './prometheus/prometheus.module';
 import { RepositoryModule } from './common/repository/repository.module';
 import { ProfileModule } from './modules/profile/profile.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -93,6 +94,7 @@ import { ProfileModule } from './modules/profile/profile.module';
     PaymentModule,
     PrometheusModule,
     ProfileModule,
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [
