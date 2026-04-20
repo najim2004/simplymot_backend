@@ -18,24 +18,29 @@ import { StringHelper } from 'src/common/helper/string.helper';
 import appConfig from 'src/config/app.config';
 import { Logger } from '@nestjs/common';
 import { CreateBreakTimeDto, CreateHolidayDto } from './dto/create-garage.dto';
+import {
+  BlockUnblockSlotsDto,
+  GetGarageSlotsQueryDto,
+} from './dto/query-garage.dto';
+import { SlotRepository } from 'src/common/repository/slot/slot.repository';
 
 @Injectable()
 export class GarageService {
   private readonly logger = new Logger(GarageService.name);
+  private readonly dayOfWeekOrder: DayOfWeek[] = [
+    DayOfWeek.MONDAY,
+    DayOfWeek.TUESDAY,
+    DayOfWeek.WEDNESDAY,
+    DayOfWeek.THURSDAY,
+    DayOfWeek.FRIDAY,
+    DayOfWeek.SATURDAY,
+    DayOfWeek.SUNDAY,
+  ];
+
   constructor(
     private readonly prisma: PrismaService,
-    private readonly dayOfWeekOrder: DayOfWeek[],
-  ) {
-    this.dayOfWeekOrder = [
-      DayOfWeek.MONDAY,
-      DayOfWeek.TUESDAY,
-      DayOfWeek.WEDNESDAY,
-      DayOfWeek.THURSDAY,
-      DayOfWeek.FRIDAY,
-      DayOfWeek.SATURDAY,
-      DayOfWeek.SUNDAY,
-    ];
-  }
+    private readonly slotRepository: SlotRepository,
+  ) {}
 
   async getGarage(user_id: string) {
     const garage = await this.prisma.garage.findFirst({
@@ -702,6 +707,32 @@ export class GarageService {
     return ResponseHelper.success({
       message: 'Holiday deleted successfully',
       data: deletedHoliday,
+    });
+  }
+
+  async getSlots(garage_id: string, query: GetGarageSlotsQueryDto = {}) {
+    const slots = await this.slotRepository.getSlots(garage_id, query);
+
+    return ResponseHelper.success({
+      message: 'Slots fetched successfully',
+      data: slots,
+    });
+  }
+
+  async blockUnblockSlots(
+    blockUnblockSlotsDto: BlockUnblockSlotsDto,
+    garage_id: string,
+    type: 'block' | 'unblock',
+  ) {
+    const slot = await this.slotRepository.blockUnblockSlots(
+      garage_id,
+      blockUnblockSlotsDto,
+      type,
+    );
+
+    return ResponseHelper.success({
+      message: `Slot ${type === 'block' ? 'blocked' : 'unblocked'} successfully`,
+      data: slot,
     });
   }
 }

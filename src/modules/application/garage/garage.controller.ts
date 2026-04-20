@@ -21,7 +21,11 @@ import { User } from 'src/modules/auth/decorators/get-user.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { CreateBreakTimeDto, CreateHolidayDto } from './dto/create-garage.dto';
-import { GetGarageHolidaysQueryDto } from './dto/query-garage.dto';
+import {
+  BlockUnblockSlotsDto,
+  GetGarageHolidaysQueryDto,
+  GetGarageSlotsQueryDto,
+} from './dto/query-garage.dto';
 
 @Controller('garage')
 export class GarageController {
@@ -143,8 +147,38 @@ export class GarageController {
     );
   }
 
-  // ---------------- SERVICES ----------------
+  // ---------------- Time Slot ----------------
 
+  @Get(':garage_id/slots')
+  getSlots(
+    @Param('garage_id') garage_id: string,
+    @Query() query: GetGarageSlotsQueryDto,
+  ) {
+    return this.garageService.getSlots(garage_id, query);
+  }
+  @Patch(':garage_id/slots/block')
+  blockSlots(
+    @Param('garage_id') garage_id: string,
+    @Body() blockSlotsDto: BlockUnblockSlotsDto,
+  ) {
+    return this.garageService.blockUnblockSlots(
+      blockSlotsDto,
+      garage_id,
+      'block',
+    );
+  }
+  @Patch(':garage_id/slots/unblock')
+  unblockSlots(
+    @Param('garage_id') garage_id: string,
+    @Body() unblockSlotsDto: BlockUnblockSlotsDto,
+  ) {
+    return this.garageService.blockUnblockSlots(
+      unblockSlotsDto,
+      garage_id,
+      'unblock',
+    );
+  }
+  // ---------------- SERVICES ----------------
   @Get(':garage_id/services')
   getServices(
     @Param('garage_id') garage_id: string,

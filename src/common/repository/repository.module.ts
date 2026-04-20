@@ -7,6 +7,7 @@ import { TransactionRepository } from './transaction/transaction.repository';
 import { UcodeRepository } from './ucode/ucode.repository';
 import { VehicleRepository } from './vehicle/vehicle.repository';
 import { SubscriptionRepository } from './subscription/subscription.repository';
+import { SlotRepository } from './slot/slot.repository';
 
 @Global()
 @Module({
@@ -19,6 +20,7 @@ import { SubscriptionRepository } from './subscription/subscription.repository';
     UcodeRepository,
     VehicleRepository,
     SubscriptionRepository,
+    SlotRepository,
   ],
   exports: [
     UserRepository,
@@ -28,6 +30,7 @@ import { SubscriptionRepository } from './subscription/subscription.repository';
     UcodeRepository,
     VehicleRepository,
     SubscriptionRepository,
+    SlotRepository,
   ],
 })
 export class RepositoryModule {}

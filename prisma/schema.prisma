@@ -107,6 +107,13 @@ enum PaymentTransactionStatus {
   CANCELLED
 }
 
+enum TimeSlotStatus {
+  AVAILABLE
+  BOOKED
+  BLOCKED
+  BREAK
+}
+
 model Account {
   id         String   @id @default(cuid())
   created_at DateTime @default(now())
@@ -303,24 +310,24 @@ model Holiday {
 model TimeSlot {
   id String @id @default(cuid())
 
-  garage_id String?
-  garage    Garage? @relation(fields: [garage_id], references: [id], onDelete: Cascade)
-
   starts_at DateTime @db.Timestamptz(6)
   ends_at   DateTime @db.Timestamptz(6)
 
-  is_available Boolean @default(true)
-  is_blocked   Boolean @default(false)
+  status TimeSlotStatus @default(AVAILABLE)
+  description String?
 
+  garage_id   String?
   booking_id  String? @unique
   schedule_id String?
   customer_id String?
 
+  garage   Garage?   @relation(fields: [garage_id], references: [id], onDelete: Cascade)
   customer User?     @relation(fields: [customer_id], references: [id], onDelete: SetNull)
   schedule Schedule? @relation(fields: [schedule_id], references: [id], onDelete: SetNull)
   booking  Booking?
 
   @@unique([garage_id, starts_at])
+  @@index([status])
   @@index([garage_id, starts_at, ends_at])
   @@index([starts_at, ends_at])
   @@index([schedule_id])
