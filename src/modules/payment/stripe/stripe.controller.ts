@@ -23,6 +23,12 @@ export class StripeController {
       switch (event.type) {
         case 'customer.created':
           break;
+        case 'checkout.session.completed':
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated':
+        case 'customer.subscription.deleted':
+          await this.stripeService.handleSubscriptionEvent(event);
+          break;
         case 'payment_intent.created':
           break;
         case 'payment_intent.succeeded':
@@ -48,6 +54,7 @@ export class StripeController {
             status: 'failed',
             raw_status: failedPaymentIntent.status,
           });
+          break;
         case 'payment_intent.canceled':
           const canceledPaymentIntent = event.data.object;
           // Update transaction status in database
