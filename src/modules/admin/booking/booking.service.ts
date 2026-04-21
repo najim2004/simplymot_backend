@@ -130,9 +130,6 @@ export class BookingService {
             year_of_manufacture: true,
             mot_last_checked_at: true,
             reminder_last_sent_at: true,
-            raw_mot_data: true,
-            raw_dvla_data: true,
-            raw_mot_status: true,
           },
         },
         garage: {

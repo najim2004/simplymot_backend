@@ -37,6 +37,7 @@ import {
   UserKind,
 } from 'prisma/generated/enums';
 import { Prisma } from 'prisma/generated/client';
+import { PostCodeMapRepository } from 'src/common/repository/post-code-map/post-code-map.repository';
 
 @Injectable()
 export class AuthService {
@@ -48,6 +49,7 @@ export class AuthService {
     private mailService: MailService,
     private userRepository: UserRepository,
     private ucodeRepository: UcodeRepository,
+    private postCodeMapRepository: PostCodeMapRepository,
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
@@ -359,6 +361,11 @@ export class AuthService {
       vts_number,
       primary_contact,
       phone_number,
+      post_code,
+      address,
+      city,
+      state,
+      country,
     } = registerUserDto;
     // Check if email already exist
     const userEmailExist = await this.userRepository.exist({
@@ -379,6 +386,10 @@ export class AuthService {
     });
 
     if (kind === UserKind.GARAGE) {
+      const location = post_code
+        ? await this.postCodeMapRepository.getLatLng(post_code)
+        : null;
+
       await this.prisma.garage.create({
         data: {
           owner: {
@@ -390,6 +401,13 @@ export class AuthService {
           vts_number: vts_number,
           contact_email: primary_contact || email,
           phone_number: phone_number,
+          address,
+          city,
+          state,
+          country,
+          post_code: post_code?.trim().toUpperCase(),
+          latitude: location?.lat,
+          longitude: location?.lng,
         },
       });
       try {

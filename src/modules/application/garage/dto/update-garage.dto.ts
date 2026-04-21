@@ -82,7 +82,7 @@ export class UpdateGarageDto {
   @IsString()
   @IsOptional()
   @MaxLength(10)
-  zip_code?: string;
+  post_code?: string;
 
   @ApiPropertyOptional({
     description: 'Full address',

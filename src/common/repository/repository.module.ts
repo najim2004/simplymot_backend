@@ -8,6 +8,7 @@ import { UcodeRepository } from './ucode/ucode.repository';
 import { VehicleRepository } from './vehicle/vehicle.repository';
 import { SubscriptionRepository } from './subscription/subscription.repository';
 import { SlotRepository } from './slot/slot.repository';
+import { PostCodeMapRepository } from './post-code-map/post-code-map.repository';
 
 @Global()
 @Module({
@@ -21,6 +22,7 @@ import { SlotRepository } from './slot/slot.repository';
     VehicleRepository,
     SubscriptionRepository,
     SlotRepository,
+    PostCodeMapRepository,
   ],
   exports: [
     UserRepository,
@@ -31,6 +33,7 @@ import { SlotRepository } from './slot/slot.repository';
     VehicleRepository,
     SubscriptionRepository,
     SlotRepository,
+    PostCodeMapRepository,
   ],
 })
 export class RepositoryModule {}

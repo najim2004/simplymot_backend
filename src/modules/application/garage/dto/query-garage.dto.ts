@@ -5,6 +5,7 @@ import {
   Matches,
   IsNumber,
   IsEnum,
+  IsDate,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';

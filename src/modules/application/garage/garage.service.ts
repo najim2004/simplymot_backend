@@ -3,6 +3,7 @@ import {
   NotFoundException,
   InternalServerErrorException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import {
   ScheduleIntervalDto,
@@ -17,6 +18,7 @@ import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
 import { StringHelper } from 'src/common/helper/string.helper';
 import appConfig from 'src/config/app.config';
 import { Logger } from '@nestjs/common';
+import { DvlaService } from 'src/common/lib/DVLA/DvlaService';
 import { CreateBreakTimeDto, CreateHolidayDto } from './dto/create-garage.dto';
 import {
   BlockUnblockSlotsDto,
@@ -25,8 +27,27 @@ import {
   Sort,
   SortOrder,
 } from './dto/query-garage.dto';
-import { Prisma } from 'prisma/generated/client';
+import { Prisma, Vehicle } from 'prisma/generated/client';
 import { SlotRepository } from 'src/common/repository/slot/slot.repository';
+import { VehicleRepository } from 'src/common/repository/vehicle/vehicle.repository';
+import { PostCodeMapRepository } from 'src/common/repository/post-code-map/post-code-map.repository';
+
+type DiscoverVehicleDetails = {
+  id: string | null;
+  registration_number: string;
+  make: string | null;
+  model: string | null;
+  color: string | null;
+  fuel_type: string | null;
+  engine_capacity: number | null;
+  co2_emissions: number | null;
+  mot_status: string | null;
+  is_expired: boolean;
+  mot_expiry_date: Date | null;
+  mot_last_checked_at: Date | null;
+  reminder_last_sent_at: Date | null;
+  year_of_manufacture: number | null;
+};
 
 @Injectable()
 export class GarageService {
@@ -44,7 +65,124 @@ export class GarageService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly slotRepository: SlotRepository,
+    private readonly vehicleRepository: VehicleRepository,
+    private readonly postCodeMapRepository: PostCodeMapRepository,
   ) {}
+
+  private normalizeRegistrationNumber(registration_number: string) {
+    return registration_number.replace(/\s/g, '').toUpperCase();
+  }
+
+  private formatVehicle(vehicle: Vehicle): DiscoverVehicleDetails {
+    return {
+      id: vehicle.id,
+      registration_number: vehicle.registration_number,
+      make: vehicle.make,
+      model: vehicle.model,
+      color: vehicle.color,
+      fuel_type: vehicle.fuel_type,
+      engine_capacity: vehicle.engine_capacity,
+      co2_emissions: vehicle.co2_emissions,
+      mot_status: vehicle.mot_status,
+      is_expired: vehicle.is_expired,
+      mot_expiry_date: vehicle.mot_expiry_date,
+      mot_last_checked_at: vehicle.mot_last_checked_at,
+      reminder_last_sent_at: vehicle.reminder_last_sent_at,
+      year_of_manufacture: vehicle.year_of_manufacture,
+    };
+  }
+
+  private formatDvlaVehicle(
+    registration_number: string,
+    dvlaData: Awaited<ReturnType<typeof DvlaService.getVehicleDetails>>,
+  ): DiscoverVehicleDetails {
+    return {
+      id: null,
+      registration_number,
+      make: dvlaData.make ?? null,
+      model: null,
+      color: dvlaData.colour ?? null,
+      fuel_type: dvlaData.fuelType ?? null,
+      engine_capacity: dvlaData.engineCapacity ?? null,
+      co2_emissions: dvlaData.co2Emissions ?? null,
+      mot_status: dvlaData.motStatus ?? null,
+      is_expired: false,
+      mot_expiry_date: dvlaData.motExpiryDate
+        ? new Date(dvlaData.motExpiryDate)
+        : null,
+      mot_last_checked_at: new Date(),
+      reminder_last_sent_at: null,
+      year_of_manufacture: dvlaData.yearOfManufacture ?? null,
+    };
+  }
+
+  private async getDiscoverVehicle(
+    registration_number: string,
+    user_id?: string,
+  ): Promise<DiscoverVehicleDetails> {
+    const normalizedRegistrationNumber =
+      this.normalizeRegistrationNumber(registration_number);
+
+    let vehicle = await this.prisma.vehicle.findUnique({
+      where: {
+        registration_number: normalizedRegistrationNumber,
+      },
+    });
+
+    if (!user_id) {
+      if (!vehicle) {
+        const dvlaData = await DvlaService.getVehicleDetails(
+          normalizedRegistrationNumber,
+        );
+
+        return this.formatDvlaVehicle(normalizedRegistrationNumber, dvlaData);
+      }
+
+      return this.formatVehicle(vehicle);
+    }
+
+    if (user_id && vehicle?.user_id && vehicle.user_id !== user_id) {
+      throw new ConflictException(
+        `This vehicle-(${normalizedRegistrationNumber}) is already have an owner`,
+      );
+    }
+
+    if (vehicle && user_id && !vehicle.user_id) {
+      vehicle = await this.prisma.vehicle.update({
+        where: {
+          id: vehicle.id,
+        },
+        data: {
+          user_id,
+        },
+      });
+    }
+
+    if (!vehicle) {
+      vehicle = await this.prisma.vehicle.create({
+        data: {
+          registration_number: normalizedRegistrationNumber,
+          ...(user_id ? { user_id } : {}),
+        },
+      });
+    }
+
+    if (
+      this.vehicleRepository.shouldRefreshMotData(vehicle.mot_last_checked_at)
+    ) {
+      try {
+        vehicle =
+          await this.vehicleRepository.refreshVehicleDataFromDvla(vehicle);
+      } catch (error) {
+        this.logger.error(
+          `Failed to refresh vehicle MOT data for ${normalizedRegistrationNumber}`,
+          error,
+        );
+      }
+    }
+
+    return this.formatVehicle(vehicle);
+  }
 
   async getGarage(user_id: string) {
     const garage = await this.prisma.garage.findFirst({
@@ -123,12 +261,35 @@ export class GarageService {
       await SojebStorage.put(fileName, updateGarageDto.garage_image.buffer);
       garage_image = fileName;
     }
+
+    const {
+      garage_image: _garageImage,
+      post_code,
+      ...garageData
+    } = updateGarageDto;
+    const incomingPostCode = post_code;
+    const locationData: {
+      post_code?: string;
+      latitude?: number;
+      longitude?: number;
+    } = {};
+
+    if (incomingPostCode) {
+      const location =
+        await this.postCodeMapRepository.getLatLng(incomingPostCode);
+
+      locationData.post_code = incomingPostCode.trim().toUpperCase();
+      locationData.latitude = location.lat;
+      locationData.longitude = location.lng;
+    }
+
     const updatedGarage = await this.prisma.garage.update({
       where: {
         id: garage.id,
       },
       data: {
-        ...updateGarageDto,
+        ...garageData,
+        ...locationData,
         garage_image,
       },
     });
@@ -754,15 +915,22 @@ export class GarageService {
     const safePage = Math.max(Number(page) || 1, 1);
     const offset = (safePage - 1) * safeLimit;
     const normalizedPostCode = post_code.trim().toUpperCase();
-    const postCodeNoSpace = normalizedPostCode.replace(/\s+/g, '');
+    const postCodeNoSpace =
+      this.postCodeMapRepository.normalize(normalizedPostCode);
+    const center =
+      await this.postCodeMapRepository.getLatLng(normalizedPostCode);
+    const vehicle = await this.getDiscoverVehicle(
+      vehicle_registration_number,
+      user_id,
+    );
     const sortDirection = sort_order === SortOrder.DESC ? 'DESC' : 'ASC';
 
     const sortSql =
       sort === Sort.PRICE
-        ? Prisma.sql`mot_price ${Prisma.raw(sortDirection)} NULLS LAST, g.garage_name ASC, g.id ASC`
+        ? Prisma.sql`mot_price ${Prisma.raw(sortDirection)} NULLS LAST,`
         : sort === Sort.RATING || sort === Sort.REVIEWS
-          ? Prisma.sql`booking_count ${Prisma.raw(sortDirection)} NULLS LAST, g.garage_name ASC, g.id ASC`
-          : Prisma.sql`g.garage_name ${Prisma.raw(sortDirection)} NULLS LAST, g.id ASC`;
+          ? Prisma.sql`booking_count ${Prisma.raw(sortDirection)} NULLS LAST,`
+          : Prisma.empty;
 
     const [rows, count] = await Promise.all([
       this.prisma.$queryRaw<
@@ -776,38 +944,78 @@ export class GarageService {
           garage_image: string | null;
           mot_price: number | null;
           booking_count: number;
+          exact_post_code_match: boolean;
+          distance_miles: number | null;
         }>
       >(Prisma.sql`
+        WITH garage_locations AS (
+          SELECT
+            g.id,
+            g.garage_name,
+            g.address,
+            g.post_code,
+            g.vts_number,
+            g.phone_number,
+            g.garage_image,
+            regexp_replace(upper(coalesce(g.post_code, '')), '\\s+', '', 'g') AS normalized_post_code,
+            coalesce(g.latitude, pcm.latitude) AS garage_latitude,
+            coalesce(g.longitude, pcm.longitude) AS garage_longitude
+          FROM "garages" g
+          LEFT JOIN "post_code_map" pcm
+            ON pcm.postcode = regexp_replace(upper(coalesce(g.post_code, '')), '\\s+', '', 'g')
+        )
         SELECT
-          g.id,
-          g.garage_name,
-          g.address,
-          g.post_code,
-          g.vts_number,
-          g.phone_number,
-          g.garage_image,
+          gl.id,
+          gl.garage_name,
+          gl.address,
+          gl.post_code,
+          gl.vts_number,
+          gl.phone_number,
+          gl.garage_image,
+          gl.normalized_post_code = ${postCodeNoSpace} AS exact_post_code_match,
+          CASE
+            WHEN gl.garage_latitude IS NOT NULL AND gl.garage_longitude IS NOT NULL THEN
+              (
+                3959 * acos(
+                  least(
+                    1,
+                    greatest(
+                      -1,
+                      cos(radians(${center.lat})) * cos(radians(gl.garage_latitude)) *
+                      cos(radians(gl.garage_longitude) - radians(${center.lng})) +
+                      sin(radians(${center.lat})) * sin(radians(gl.garage_latitude))
+                    )
+                  )
+                )
+              )
+            ELSE NULL
+          END AS distance_miles,
           mot.price::float8 AS mot_price,
           (
             SELECT COUNT(*)::int
             FROM "bookings" b
-            WHERE b.garage_id = g.id
+            WHERE b.garage_id = gl.id
           ) AS booking_count
-        FROM "garages" g
+        FROM garage_locations gl
         LEFT JOIN LATERAL (
           SELECT s.price
           FROM "services" s
-          WHERE s.garage_id = g.id AND s.type = 'MOT'
+          WHERE s.garage_id = gl.id AND s.type = 'MOT'
           LIMIT 1
         ) mot ON TRUE
-        WHERE regexp_replace(upper(coalesce(g.post_code, '')), '\\s+', '', 'g') = ${postCodeNoSpace}
-        ORDER BY ${sortSql}
+        ORDER BY
+          exact_post_code_match DESC,
+          CASE WHEN distance_miles IS NULL THEN 1 ELSE 0 END ASC,
+          distance_miles ASC NULLS LAST,
+          ${sortSql}
+          gl.garage_name ASC NULLS LAST,
+          gl.id ASC
         LIMIT ${safeLimit}
         OFFSET ${offset};
       `),
       this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
         SELECT COUNT(*)::bigint AS count
-        FROM "garages" g
-        WHERE regexp_replace(upper(coalesce(g.post_code, '')), '\\s+', '', 'g') = ${postCodeNoSpace};
+        FROM "garages" g;
       `),
     ]);
 
@@ -815,24 +1023,32 @@ export class GarageService {
 
     return ResponseHelper.success({
       message: 'Garages discovered successfully',
-      data: rows.map((row) => ({
-        id: row.id,
-        garage_name: row.garage_name || 'Unnamed Garage',
-        address: row.address || 'Address not provided',
-        post_code: row.post_code || '',
-        vts_number: row.vts_number || 'VTS not provided',
-        phone_number: row.phone_number || 'Phone not provided',
-        garage_image: row.garage_image
-          ? SojebStorage.url(row.garage_image)
-          : null,
-        mot_price: typeof row.mot_price === 'number' ? row.mot_price : null,
-        total_bookings: row.booking_count || 0,
-      })),
+      data: {
+        vehicle,
+        garages: rows.map((row) => ({
+          id: row.id,
+          garage_name: row.garage_name || 'Unnamed Garage',
+          address: row.address || 'Address not provided',
+          post_code: row.post_code || '',
+          vts_number: row.vts_number || 'VTS not provided',
+          phone_number: row.phone_number || 'Phone not provided',
+          garage_image: row.garage_image
+            ? SojebStorage.url(row.garage_image)
+            : null,
+          mot_price: typeof row.mot_price === 'number' ? row.mot_price : null,
+          total_bookings: row.booking_count || 0,
+          exact_post_code_match: row.exact_post_code_match,
+          distance_miles:
+            typeof row.distance_miles === 'number'
+              ? Number(row.distance_miles.toFixed(2))
+              : null,
+        })),
+      },
       meta_data: {
         page: safePage,
         limit: safeLimit,
         total: totalCount,
-        vehicle_registration_number: vehicle_registration_number?.toUpperCase(),
+        vehicle_registration_number: vehicle.registration_number,
         post_code: normalizedPostCode,
         filters: {
           sort,

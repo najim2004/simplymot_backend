@@ -3,6 +3,7 @@ import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MinLength,
   ValidateIf,
@@ -92,6 +93,52 @@ export class RegisterUserDto {
   })
   @IsString()
   primary_contact?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Garage postcode. Used to calculate garage latitude/longitude.',
+    example: 'SW1A 0AA',
+  })
+  @ValidateIf((o) => o.kind === UserKind.GARAGE)
+  @IsOptional()
+  @IsString()
+  post_code?: string;
+
+  @ApiPropertyOptional({
+    description: 'Garage full address',
+    example: '123 Main Street, London',
+  })
+  @ValidateIf((o) => o.kind === UserKind.GARAGE)
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional({
+    description: 'Garage city',
+    example: 'London',
+  })
+  @ValidateIf((o) => o.kind === UserKind.GARAGE)
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiPropertyOptional({
+    description: 'Garage state or county',
+    example: 'Greater London',
+  })
+  @ValidateIf((o) => o.kind === UserKind.GARAGE)
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @ApiPropertyOptional({
+    description: 'Garage country',
+    example: 'UK',
+  })
+  @ValidateIf((o) => o.kind === UserKind.GARAGE)
+  @IsOptional()
+  @IsString()
+  country?: string;
 }
 
 export class ForgotPasswordDto {
