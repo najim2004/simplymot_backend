@@ -40,6 +40,7 @@ type SubscriptionWithPlan = Prisma.SubscriptionGetPayload<{
 @Injectable()
 export class SubscriptionService {
   private readonly logger = new Logger(SubscriptionService.name);
+  private readonly pendingCheckoutTtlMs = 24 * 60 * 60 * 1000;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -139,15 +140,10 @@ export class SubscriptionService {
 
     const stripeCustomerId = await this.getOrCreateStripeCustomer(user);
 
-    const subscription = await this.prisma.subscription.create({
-      data: {
-        user_id,
-        plan_id: plan.id,
-        status: SubscriptionStatus.INACTIVE,
-        price_pence: plan.price_pence,
-        currency: plan.currency,
-        stripe_customer_id: stripeCustomerId,
-      },
+    const subscription = await this.getOrCreatePendingCheckoutSubscription({
+      user_id,
+      plan,
+      stripeCustomerId,
     });
 
     try {
@@ -471,6 +467,77 @@ export class SubscriptionService {
     });
 
     return customer.id;
+  }
+
+  private async getOrCreatePendingCheckoutSubscription({
+    user_id,
+    plan,
+    stripeCustomerId,
+  }: {
+    user_id: string;
+    plan: {
+      id: string;
+      price_pence: number;
+      currency: string;
+    };
+    stripeCustomerId: string;
+  }) {
+    const staleBefore = new Date(Date.now() - this.pendingCheckoutTtlMs);
+
+    await this.prisma.subscription.updateMany({
+      where: {
+        user_id,
+        status: SubscriptionStatus.INACTIVE,
+        OR: [
+          { plan_id: { not: plan.id } },
+          { created_at: { lt: staleBefore } },
+        ],
+      },
+      data: {
+        status: SubscriptionStatus.CANCELLED,
+        cancel_at: new Date(),
+        cancellation_reason: 'Checkout abandoned or replaced',
+      },
+    });
+
+    const reusableSubscription = await this.prisma.subscription.findFirst({
+      where: {
+        user_id,
+        plan_id: plan.id,
+        status: SubscriptionStatus.INACTIVE,
+        created_at: { gte: staleBefore },
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    if (reusableSubscription) {
+      return await this.prisma.subscription.update({
+        where: {
+          id: reusableSubscription.id,
+        },
+        data: {
+          price_pence: plan.price_pence,
+          currency: plan.currency,
+          stripe_customer_id: stripeCustomerId,
+          cancellation_reason: null,
+          cancel_at: null,
+          cancel_at_period_end: false,
+        },
+      });
+    }
+
+    return await this.prisma.subscription.create({
+      data: {
+        user_id,
+        plan_id: plan.id,
+        status: SubscriptionStatus.INACTIVE,
+        price_pence: plan.price_pence,
+        currency: plan.currency,
+        stripe_customer_id: stripeCustomerId,
+      },
+    });
   }
 
   private async findLatestSubscription(user_id: string) {
