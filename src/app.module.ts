@@ -26,6 +26,7 @@ import { PrometheusModule } from './prometheus/prometheus.module';
 import { RepositoryModule } from './common/repository/repository.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { JobsModule } from './jobs/jobs.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { JobsModule } from './jobs/jobs.module';
     PrometheusModule,
     ProfileModule,
     JobsModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [

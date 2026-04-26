@@ -22,7 +22,7 @@ import {
   QueryAvailableSubscriptionPlansDto,
   SubscriptionCheckoutDto,
 } from './dto/create-subscription.dto';
-import { PromoCodeService } from 'src/modules/promo-code/promo-code.service';
+import { PromoCodeService } from 'src/modules/admin/promo-code/promo-code.service';
 
 type SubscriptionWithPlan = Prisma.SubscriptionGetPayload<{
   include: {

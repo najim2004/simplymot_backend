@@ -21,8 +21,8 @@ import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guard/role/roles.guard';
 import { Roles } from 'src/common/guard/role/roles.decorator';
 import { Role } from 'src/common/guard/role/role.enum';
-import { CreatePromoCodeDto } from 'src/modules/promo-code/dto/create-promo-code.dto';
-import { PromoCodeService } from 'src/modules/promo-code/promo-code.service';
+import { CreatePromoCodeDto } from './dto/create-promo-code.dto';
+import { PromoCodeService } from './promo-code.service';
 
 @ApiTags('Admin Promo Codes')
 @ApiBearerAuth()

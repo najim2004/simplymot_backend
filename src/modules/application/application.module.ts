@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { NotificationModule } from './notification/notification.module';
 import { ContactModule } from './contact/contact.module';
 import { FaqModule } from './faq/faq.module';
 import { SubscriptionModule } from './subscription/subscription.module';
@@ -10,7 +9,6 @@ import { InvoiceModule } from './invoice/invoice.module';
 
 @Module({
   imports: [
-    NotificationModule,
     ContactModule,
     FaqModule,
     SubscriptionModule,
