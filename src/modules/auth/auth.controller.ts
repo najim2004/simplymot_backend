@@ -79,7 +79,9 @@ export class AuthController {
     description: 'Returns a JWT access token and a normalized user payload.',
   })
   @ApiOkResponse({ type: LoginResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Invalid credentials or account state' })
+  @ApiUnauthorizedResponse({
+    description: 'Invalid credentials or account state',
+  })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   login(@User('id') id: string, @User('email') email: string) {
@@ -88,7 +90,8 @@ export class AuthController {
 
   @ApiOperation({
     summary: 'Update profile (multipart)',
-    description: 'Send `name`, `phone_number` as form fields; optional `avatar` file.',
+    description:
+      'Send `name`, `phone_number` as form fields; optional `avatar` file.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({

@@ -13,6 +13,7 @@ import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guard/role/roles.guard';
 import { Roles } from 'src/common/guard/role/roles.decorator';
 import { Role } from 'src/common/guard/role/role.enum';
+import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
 
 @ApiTags('Transaction')
 @ApiBearerAuth()
@@ -23,18 +24,39 @@ export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
 
   @ApiOperation({ summary: 'List transactions (paginated)' })
+  @ApiSuccessResponse({
+    summary: 'List transactions',
+    message: 'Transactions fetched successfully',
+    data: [],
+    metaData: { total: 1, page: 1, limit: 10 },
+    includeAuthErrors: true,
+  })
   @Get()
   findAll(@Query() query: QueryTransactionDto) {
     return this.transactionService.findAll(query);
   }
 
   @ApiOperation({ summary: 'Get one transaction by id' })
+  @ApiSuccessResponse({
+    summary: 'Get one transaction by id',
+    message: 'Transaction fetched successfully',
+    data: { id: 'transaction_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Get(':id')
   findOne(@Param('id') id: string, @Query() query: QueryTransactionDto) {
     return this.transactionService.findOne(id, query);
   }
 
   @ApiOperation({ summary: 'Soft-delete a transaction' })
+  @ApiSuccessResponse({
+    summary: 'Soft-delete a transaction',
+    message: 'Transaction deleted successfully',
+    data: { id: 'transaction_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Delete(':id')
   remove(@Param('id') id: string, @Query() query: QueryTransactionDto) {
     return this.transactionService.softRemove(id, query);

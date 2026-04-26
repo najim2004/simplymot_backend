@@ -29,16 +29,32 @@ import {
   GetGarageSlotsQueryDto,
 } from './dto/query-garage.dto';
 import { OptionalJwtAuthGuard } from 'src/modules/auth/guards/optional-jwt-auth.guard';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
 
+@ApiTags('Garage')
+@ApiBearerAuth()
 @Controller('garage')
 export class GarageController {
   constructor(private readonly garageService: GarageService) {}
 
+  @ApiSuccessResponse({
+    summary: 'Get my garage',
+    message: 'Garage fetched successfully',
+    data: { id: 'garage_id' },
+    includeAuthErrors: true,
+  })
   @Get()
   getGarage(@User('id') id: string) {
     return this.garageService.getGarage(id);
   }
 
+  @ApiSuccessResponse({
+    summary: 'Discover garages',
+    message: 'Garages fetched successfully',
+    data: [],
+    metaData: { total: 1, page: 1, limit: 10 },
+  })
   @Get('discover')
   @UseGuards(OptionalJwtAuthGuard)
   discoverGarages(
@@ -49,6 +65,13 @@ export class GarageController {
   }
 
   // ---------------- SCHEDULE ----------------
+  @ApiSuccessResponse({
+    summary: 'Get garage schedule',
+    message: 'Schedule fetched successfully',
+    data: { id: 'schedule_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Get(':garage_id/schedule')
   getSchedule(
     @Param('garage_id') garage_id: string,
@@ -57,6 +80,13 @@ export class GarageController {
     return this.garageService.getSchedule(garage_id, user_id);
   }
 
+  @ApiSuccessResponse({
+    summary: 'Create or update garage schedule',
+    message: 'Schedule saved successfully',
+    data: { id: 'schedule_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Put(':garage_id/schedule')
   upsertSchedule(
     @Param('garage_id') garage_id: string,
@@ -70,6 +100,13 @@ export class GarageController {
     );
   }
 
+  @ApiSuccessResponse({
+    summary: 'Create break time',
+    message: 'Break time created successfully',
+    data: { id: 'break_time_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Post(':garage_id/schedule/:schedule_id/break_times')
   createBreakTime(
     @Param('garage_id') garage_id: string,
@@ -85,6 +122,13 @@ export class GarageController {
     );
   }
 
+  @ApiSuccessResponse({
+    summary: 'List break times',
+    message: 'Break times fetched successfully',
+    data: [],
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Get(':garage_id/schedule/:schedule_id/break_times')
   getBreakTimes(
     @Param('garage_id') garage_id: string,
@@ -94,6 +138,13 @@ export class GarageController {
     return this.garageService.getBreakTimes(garage_id, schedule_id, user_id);
   }
 
+  @ApiSuccessResponse({
+    summary: 'Delete break time',
+    message: 'Break time deleted successfully',
+    data: { id: 'break_time_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Delete(':garage_id/schedule/:schedule_id/break_times/:break_time_id')
   deleteBreakTime(
     @Param('garage_id') garage_id: string,
@@ -109,6 +160,13 @@ export class GarageController {
     );
   }
 
+  @ApiSuccessResponse({
+    summary: 'Create holiday',
+    message: 'Holiday created successfully',
+    data: { id: 'holiday_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Post(':garage_id/schedule/:schedule_id/holidays')
   createHoliday(
     @Param('garage_id') garage_id: string,
@@ -124,6 +182,13 @@ export class GarageController {
     );
   }
 
+  @ApiSuccessResponse({
+    summary: 'List holidays',
+    message: 'Holidays fetched successfully',
+    data: [],
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Get(':garage_id/schedule/:schedule_id/holidays')
   getHolidays(
     @Param('garage_id') garage_id: string,
@@ -139,6 +204,13 @@ export class GarageController {
     );
   }
 
+  @ApiSuccessResponse({
+    summary: 'Delete holiday',
+    message: 'Holiday deleted successfully',
+    data: { id: 'holiday_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Delete(':garage_id/schedule/:schedule_id/holidays/:holiday_id')
   deleteHoliday(
     @Param('garage_id') garage_id: string,
@@ -156,6 +228,12 @@ export class GarageController {
 
   // ---------------- Time Slot ----------------
 
+  @ApiSuccessResponse({
+    summary: 'List garage slots',
+    message: 'Slots fetched successfully',
+    data: [],
+    includeNotFound: true,
+  })
   @Get(':garage_id/slots')
   getSlots(
     @Param('garage_id') garage_id: string,
@@ -164,6 +242,12 @@ export class GarageController {
     return this.garageService.getSlots(garage_id, query);
   }
 
+  @ApiSuccessResponse({
+    summary: 'Block garage slots',
+    message: 'Slots blocked successfully',
+    data: { updated_count: 1 },
+    includeAuthErrors: true,
+  })
   @Patch(':garage_id/slots/block')
   blockSlots(
     @Param('garage_id') garage_id: string,
@@ -176,6 +260,12 @@ export class GarageController {
     );
   }
 
+  @ApiSuccessResponse({
+    summary: 'Unblock garage slots',
+    message: 'Slots unblocked successfully',
+    data: { updated_count: 1 },
+    includeAuthErrors: true,
+  })
   @Patch(':garage_id/slots/unblock')
   unblockSlots(
     @Param('garage_id') garage_id: string,
@@ -189,6 +279,13 @@ export class GarageController {
   }
 
   // ---------------- SERVICES ----------------
+  @ApiSuccessResponse({
+    summary: 'List garage services',
+    message: 'Services fetched successfully',
+    data: [],
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Get(':garage_id/services')
   getServices(
     @Param('garage_id') garage_id: string,
@@ -197,6 +294,13 @@ export class GarageController {
     return this.garageService.getServices(garage_id, user_id);
   }
 
+  @ApiSuccessResponse({
+    summary: 'Create or update garage service',
+    message: 'Service saved successfully',
+    data: { id: 'service_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Put(':garage_id/services')
   upsertService(
     @Param('garage_id') garage_id: string,
@@ -210,6 +314,13 @@ export class GarageController {
     );
   }
 
+  @ApiSuccessResponse({
+    summary: 'Delete garage service',
+    message: 'Service deleted successfully',
+    data: { id: 'service_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Delete(':garage_id/services/:id')
   deleteService(@Param('id') id: string, @User('id') user_id: string) {
     return this.garageService.deleteService(id, user_id);
@@ -217,6 +328,14 @@ export class GarageController {
 
   // ---------------- GENERIC ----------------
 
+  @ApiConsumes('multipart/form-data')
+  @ApiSuccessResponse({
+    summary: 'Update garage profile',
+    message: 'Garage updated successfully',
+    data: { id: 'garage_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
   @Patch(':garage_id')
   @UseInterceptors(
     FileInterceptor('garage_image', {

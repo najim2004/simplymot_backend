@@ -148,7 +148,9 @@ export class RoleController {
   @ApiParam({ name: 'id', description: 'Role id (cuid)' })
   @ApiOkResponse({ type: UpdateRoleResponseDto })
   @ApiNotFoundResponse({ description: 'Role not found' })
-  @ApiBadRequestResponse({ description: 'Validation or business rule violation' })
+  @ApiBadRequestResponse({
+    description: 'Validation or business rule violation',
+  })
   @CheckAbilities({ action: Action.Update, subject: 'Role' })
   async updateRole(
     @Param('id') id: string,

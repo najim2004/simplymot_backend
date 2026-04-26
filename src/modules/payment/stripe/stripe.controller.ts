@@ -2,7 +2,9 @@ import { Controller, Post, Req, Headers } from '@nestjs/common';
 import { StripeService } from './stripe.service';
 import { Request } from 'express';
 import { TransactionRepository } from '../../../common/repository/transaction/transaction.repository';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Stripe')
 @Controller('payment/stripe')
 export class StripeController {
   constructor(
@@ -10,6 +12,12 @@ export class StripeController {
     private transactionRepository: TransactionRepository,
   ) {}
 
+  @ApiOperation({ summary: 'Handle Stripe webhook events' })
+  @ApiOkResponse({
+    schema: {
+      example: { received: true },
+    },
+  })
   @Post('webhook')
   async handleWebhook(
     @Headers('stripe-signature') signature: string,
