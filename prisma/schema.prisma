@@ -84,6 +84,12 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+enum PromoCodeDuration {
+  ONCE
+  REPEATING
+  FOREVER
+}
+
 enum BookingStatus {
   PENDING
   ACCEPTED
@@ -664,6 +670,32 @@ model Subscription {
   @@index([is_grandfathered, migration_scheduled_at])
   @@index([plan_id, status])
   @@map("subscriptions")
+}
+
+model PromoCode {
+  id         String   @id @default(cuid())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  code        String            @unique
+  name        String?
+  percent_off Int               @default(100)
+  duration    PromoCodeDuration
+
+  duration_days      Int?
+  duration_in_months Int?
+  max_redemptions    Int?
+  redeemed_count     Int       @default(0)
+  expires_at         DateTime?
+  is_active          Boolean   @default(true)
+
+  stripe_coupon_id         String
+  stripe_promotion_code_id String  @unique
+  created_by_id            String?
+
+  @@index([is_active])
+  @@index([duration])
+  @@map("promo_codes")
 }
 
 /// Bulk price-migration orchestration (notice campaign or Stripe price switch), per plan.

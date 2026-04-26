@@ -8,6 +8,7 @@ import { BookingModule } from './booking/booking.module';
 import { GarageModule } from './garage/garage.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { RoleModule } from './role/role.module';
+import { PromoCodeModule } from './promo-code/promo-code.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { RoleModule } from './role/role.module';
     BookingModule,
     GarageModule,
     SubscriptionModule,
+    PromoCodeModule,
   ],
 })
 export class AdminModule {}

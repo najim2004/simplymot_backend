@@ -40,6 +40,14 @@ export class SubscriptionCheckoutDto {
   @IsNotEmpty()
   @IsString()
   plan_id: string;
+
+  @ApiPropertyOptional({
+    description: 'Optional promo code to apply to the subscription checkout',
+    example: 'FREE3MONTHS',
+  })
+  @IsOptional()
+  @IsString()
+  promo_code?: string;
 }
 
 export class CancelSubscriptionDto {

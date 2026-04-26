@@ -22,6 +22,7 @@ import {
   QueryAvailableSubscriptionPlansDto,
   SubscriptionCheckoutDto,
 } from './dto/create-subscription.dto';
+import { PromoCodeService } from 'src/modules/promo-code/promo-code.service';
 
 type SubscriptionWithPlan = Prisma.SubscriptionGetPayload<{
   include: {
@@ -42,7 +43,10 @@ export class SubscriptionService {
   private readonly logger = new Logger(SubscriptionService.name);
   private readonly pendingCheckoutTtlMs = 24 * 60 * 60 * 1000;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly promoCodeService: PromoCodeService,
+  ) {}
 
   async getAvailablePlans(query: QueryAvailableSubscriptionPlansDto = {}) {
     const page = Math.max(Number(query.page) || 1, 1);
@@ -139,6 +143,9 @@ export class SubscriptionService {
     }
 
     const stripeCustomerId = await this.getOrCreateStripeCustomer(user);
+    const promoCode = await this.promoCodeService.validateForRedemption(
+      checkoutDto.promo_code,
+    );
 
     const subscription = await this.getOrCreatePendingCheckoutSubscription({
       user_id,
@@ -157,10 +164,16 @@ export class SubscriptionService {
             user_id,
             plan_id: plan.id,
             source: 'garage_subscription',
+            ...(promoCode && {
+              promo_code_id: promoCode.id,
+              stripe_promotion_code_id: promoCode.stripe_promotion_code_id,
+              promo_code: promoCode.code,
+            }),
           },
           success_url: `${clientUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${clientUrl}/subscription/cancel`,
           trial_period_days: plan.trial_period_days,
+          promotion_code_id: promoCode?.stripe_promotion_code_id,
         });
 
       return ResponseHelper.success({
@@ -313,6 +326,7 @@ export class SubscriptionService {
         subscription_id: session.metadata?.subscription_id,
         user_id: session.metadata?.user_id,
         plan_id: session.metadata?.plan_id,
+        stripe_promotion_code_id: session.metadata?.stripe_promotion_code_id,
       },
     );
 
@@ -331,6 +345,7 @@ export class SubscriptionService {
       subscription_id?: string | null;
       user_id?: string | null;
       plan_id?: string | null;
+      stripe_promotion_code_id?: string | null;
     } = {},
   ): Promise<SubscriptionWithPlan> {
     const stripeSubscriptionId = stripeSubscription.id;
@@ -395,6 +410,10 @@ export class SubscriptionService {
         },
       });
     }
+
+    await this.promoCodeService.markRedeemedByStripePromotionCode(
+      hints.stripe_promotion_code_id,
+    );
 
     return subscription;
   }

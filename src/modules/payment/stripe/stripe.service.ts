@@ -57,6 +57,7 @@ export class StripeService {
         subscription_id: session.metadata?.subscription_id,
         user_id: session.metadata?.user_id,
         plan_id: session.metadata?.plan_id,
+        stripe_promotion_code_id: session.metadata?.stripe_promotion_code_id,
       },
     );
   }

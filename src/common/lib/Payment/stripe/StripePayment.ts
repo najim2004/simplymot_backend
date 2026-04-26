@@ -298,6 +298,7 @@ export class StripePayment {
     success_url,
     cancel_url,
     trial_period_days,
+    promotion_code_id,
   }: {
     customer: string;
     price: string;
@@ -305,6 +306,7 @@ export class StripePayment {
     success_url?: string;
     cancel_url?: string;
     trial_period_days?: number;
+    promotion_code_id?: string;
   }) {
     const defaultSuccessUrl = `${
       appConfig().app.url
@@ -328,6 +330,9 @@ export class StripePayment {
         ...(trialDays > 0 && { trial_period_days: trialDays }),
         metadata: metadata,
       },
+      ...(promotion_code_id && {
+        discounts: [{ promotion_code: promotion_code_id }],
+      }),
       success_url: success_url || defaultSuccessUrl,
       cancel_url: cancel_url || defaultCancelUrl,
     });
@@ -669,6 +674,61 @@ export class StripePayment {
     active: boolean;
   }): Promise<stripe.Price> {
     return Stripe.prices.update(price_id, { active });
+  }
+
+  static async createCoupon({
+    name,
+    percent_off,
+    duration,
+    duration_in_months,
+  }: {
+    name: string;
+    percent_off: number;
+    duration: stripe.CouponCreateParams.Duration;
+    duration_in_months?: number;
+  }): Promise<stripe.Coupon> {
+    return Stripe.coupons.create({
+      name,
+      percent_off,
+      duration,
+      ...(duration === 'repeating' && duration_in_months
+        ? { duration_in_months }
+        : {}),
+    });
+  }
+
+  static async createPromotionCode({
+    coupon,
+    code,
+    max_redemptions,
+    expires_at,
+    metadata,
+  }: {
+    coupon: string;
+    code: string;
+    max_redemptions?: number;
+    expires_at?: number;
+    metadata?: stripe.MetadataParam;
+  }): Promise<stripe.PromotionCode> {
+    return Stripe.promotionCodes.create({
+      coupon,
+      code,
+      max_redemptions,
+      expires_at,
+      metadata,
+    });
+  }
+
+  static async deactivatePromotionCode(
+    promotionCodeId: string,
+  ): Promise<stripe.PromotionCode> {
+    return Stripe.promotionCodes.update(promotionCodeId, { active: false });
+  }
+
+  static async retrievePromotionCode(
+    promotionCodeId: string,
+  ): Promise<stripe.PromotionCode> {
+    return Stripe.promotionCodes.retrieve(promotionCodeId);
   }
 
   // Create a Subscription for a customer and a price
