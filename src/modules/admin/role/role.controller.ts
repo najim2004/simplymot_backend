@@ -115,20 +115,22 @@ export class RoleController {
     return this.roleService.getRoleStatistics();
   }
 
-  @Get(':id')
+  @Get(':role_id')
   @ApiOperation({
     summary: 'Get one role with permissions',
   })
   @ApiParam({
-    name: 'id',
+    name: 'role_id',
     description: 'Role id (cuid)',
     example: 'clxxxxxxxxxxxxxxxxxxxxxxxx',
   })
   @ApiOkResponse({ type: RoleDetailResponseDto })
   @ApiNotFoundResponse({ description: 'Role not found or soft-deleted' })
   @CheckAbilities({ action: Action.Show, subject: 'Role' })
-  async getRole(@Param('id') id: string): Promise<RoleDetailResponseDto> {
-    return this.roleService.getRole(id);
+  async getRole(
+    @Param('role_id') role_id: string,
+  ): Promise<RoleDetailResponseDto> {
+    return this.roleService.getRole(role_id);
   }
 
   @Post()
@@ -143,9 +145,9 @@ export class RoleController {
     return this.roleService.createRole(dto);
   }
 
-  @Put(':id')
+  @Put(':role_id')
   @ApiOperation({ summary: 'Update role title or slug' })
-  @ApiParam({ name: 'id', description: 'Role id (cuid)' })
+  @ApiParam({ name: 'role_id', description: 'Role id (cuid)' })
   @ApiOkResponse({ type: UpdateRoleResponseDto })
   @ApiNotFoundResponse({ description: 'Role not found' })
   @ApiBadRequestResponse({
@@ -153,36 +155,38 @@ export class RoleController {
   })
   @CheckAbilities({ action: Action.Update, subject: 'Role' })
   async updateRole(
-    @Param('id') id: string,
+    @Param('role_id') role_id: string,
     @Body() dto: UpdateRoleDto,
   ): Promise<UpdateRoleResponseDto> {
-    return this.roleService.updateRole(id, dto);
+    return this.roleService.updateRole(role_id, dto);
   }
 
-  @Delete(':id')
+  @Delete(':role_id')
   @ApiOperation({
     summary: 'Soft-delete a role',
     description:
       'Fails if the role is assigned to users or is a protected system role.',
   })
-  @ApiParam({ name: 'id', description: 'Role id (cuid)' })
+  @ApiParam({ name: 'role_id', description: 'Role id (cuid)' })
   @ApiOkResponse({ type: DeleteRoleResponseDto })
   @ApiNotFoundResponse({ description: 'Role not found' })
   @ApiBadRequestResponse({
     description: 'Protected role, still assigned, or constraint error',
   })
   @CheckAbilities({ action: Action.Delete, subject: 'Role' })
-  async deleteRole(@Param('id') id: string): Promise<DeleteRoleResponseDto> {
-    return this.roleService.deleteRole(id);
+  async deleteRole(
+    @Param('role_id') role_id: string,
+  ): Promise<DeleteRoleResponseDto> {
+    return this.roleService.deleteRole(role_id);
   }
 
-  @Post(':id/permissions')
+  @Post(':role_id/permissions')
   @ApiOperation({
     summary: 'Assign, replace, or remove permissions on a role',
     description:
       'System tenant permissions can only be linked to the `su_admin` role.',
   })
-  @ApiParam({ name: 'id', description: 'Role id (cuid)' })
+  @ApiParam({ name: 'role_id', description: 'Role id (cuid)' })
   @ApiOkResponse({ type: SetRolePermissionsResponseDto })
   @ApiNotFoundResponse({ description: 'Role not found' })
   @ApiBadRequestResponse({
@@ -190,9 +194,9 @@ export class RoleController {
   })
   @CheckAbilities({ action: Action.Update, subject: 'Role' })
   async setRolePermissions(
-    @Param('id') id: string,
+    @Param('role_id') role_id: string,
     @Body() dto: SetRolePermissionsDto,
   ): Promise<SetRolePermissionsResponseDto> {
-    return this.roleService.setRolePermissions(id, dto);
+    return this.roleService.setRolePermissions(role_id, dto);
   }
 }

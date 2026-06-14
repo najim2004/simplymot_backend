@@ -37,13 +37,6 @@ export class StripeController {
         case 'customer.subscription.deleted':
           await this.stripeService.handleSubscriptionEvent(event);
           break;
-        case 'coupon.created':
-        case 'coupon.updated':
-        case 'coupon.deleted':
-        case 'promotion_code.created':
-        case 'promotion_code.updated':
-          await this.stripeService.handlePromoCodeEvent(event);
-          break;
         case 'payment_intent.created':
           break;
         case 'payment_intent.succeeded':

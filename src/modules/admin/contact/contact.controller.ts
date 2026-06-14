@@ -24,7 +24,7 @@ import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decor
 @ApiTags('Contact')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('admin/contact')
+@Controller('admin/contacts')
 export class ContactController {
   constructor(private readonly contactService: ContactService) {}
 
@@ -83,10 +83,10 @@ export class ContactController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
+  @Get(':contact_id')
+  async findOne(@Param('contact_id') contact_id: string) {
     try {
-      const contact = await this.contactService.findOne(id);
+      const contact = await this.contactService.findOne(contact_id);
       return contact;
     } catch (error) {
       return {
@@ -104,13 +104,16 @@ export class ContactController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Patch(':id')
+  @Patch(':contact_id')
   async update(
-    @Param('id') id: string,
+    @Param('contact_id') contact_id: string,
     @Body() updateContactDto: UpdateContactDto,
   ) {
     try {
-      const contact = await this.contactService.update(id, updateContactDto);
+      const contact = await this.contactService.update(
+        contact_id,
+        updateContactDto,
+      );
       return contact;
     } catch (error) {
       return {
@@ -128,10 +131,10 @@ export class ContactController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Delete(':id')
-  async remove(@Param('id') id: string) {
+  @Delete(':contact_id')
+  async remove(@Param('contact_id') contact_id: string) {
     try {
-      const contact = await this.contactService.remove(id);
+      const contact = await this.contactService.remove(contact_id);
       return contact;
     } catch (error) {
       return {

@@ -17,6 +17,7 @@ import {
 import { ResponseHelper } from 'src/common/helper/response.helper';
 import { QuerySubscriptionPlanDto } from './dto/query-subscription.dto';
 import { Prisma } from 'prisma/generated/client';
+import type Stripe from 'stripe';
 
 @Injectable()
 export class SubscriptionService {
@@ -25,44 +26,50 @@ export class SubscriptionService {
   async createSubscriptionPlan(
     createSubscriptionPlanDto: CreateSubscriptionPlanDto,
   ) {
+    const existingSubscriptionPlan =
+      await this.prisma.subscriptionPlan.findFirst();
+    if (existingSubscriptionPlan) {
+      throw new BadRequestException(
+        'Already has a subscription plan! Now only one subscription plan is allowed.',
+      );
+    }
+
     let stripeProductId: string | null = null;
     let stripePriceId: string | null = null;
 
     try {
-      const plan = await this.prisma.$transaction(async (tx) => {
-        const existingSubscriptionPlan = await tx.subscriptionPlan.findFirst();
-        if (existingSubscriptionPlan) {
-          throw new BadRequestException(
-            'Already has a subscription plan! Now only one subscription plan is allowed.',
-          );
-        }
+      const stripeProduct = await StripePayment.createProduct({
+        name: createSubscriptionPlanDto.name,
+        active:
+          createSubscriptionPlanDto.status === SubscriptionPlanStatus.ACTIVE,
+      });
+      stripeProductId = stripeProduct.id;
 
-        const createdPlan = await tx.subscriptionPlan.create({
-          data: createSubscriptionPlanDto,
-        });
+      const stripePrice = await StripePayment.createPrice({
+        unit_amount: createSubscriptionPlanDto.price_pence,
+        currency: createSubscriptionPlanDto.currency || 'GBP',
+        product: stripeProduct.id,
+        recurring_interval: createSubscriptionPlanDto.period_type,
+      });
+      stripePriceId = stripePrice.id;
 
-        const stripeProduct = await StripePayment.createProduct({
-          name: createSubscriptionPlanDto.name,
-          active:
-            createSubscriptionPlanDto.status === SubscriptionPlanStatus.ACTIVE,
-        });
-        stripeProductId = stripeProduct.id;
-
-        const stripePrice = await StripePayment.createPrice({
-          unit_amount: createSubscriptionPlanDto.price_pence,
-          currency: createSubscriptionPlanDto.currency,
-          product: stripeProduct.id,
-          recurring_interval: createSubscriptionPlanDto.period_type,
-        });
-        stripePriceId = stripePrice.id;
-
-        return tx.subscriptionPlan.update({
-          where: { id: createdPlan.id },
-          data: {
-            stripe_price_id: stripePrice.id,
-            stripe_product_id: stripeProduct.id,
-          },
-        });
+      const plan = await this.prisma.subscriptionPlan.create({
+        data: {
+          name: stripeProduct.name,
+          description: stripeProduct.description,
+          price_pence:
+            stripePrice.unit_amount ?? createSubscriptionPlanDto.price_pence,
+          currency: stripePrice.currency.toUpperCase(),
+          status: stripeProduct.active
+            ? SubscriptionPlanStatus.ACTIVE
+            : SubscriptionPlanStatus.INACTIVE,
+          stripe_product_id: stripeProduct.id,
+          stripe_price_id: stripePrice.id,
+          period_type: this.mapStripeIntervalToPrisma(
+            stripePrice.recurring?.interval,
+          ),
+          trial_period_days: createSubscriptionPlanDto.trial_period_days || 0,
+        },
       });
 
       return ResponseHelper.success({
@@ -222,8 +229,10 @@ export class SubscriptionService {
       updateSubscriptionDto.description !== undefined ||
       updateSubscriptionDto.status !== undefined;
 
+    let stripeProduct: Stripe.Product | null = null;
+
     if (stripeProductId && hasStripeChanges) {
-      await StripePayment.updateProduct({
+      stripeProduct = await StripePayment.updateProduct({
         product_id: stripeProductId,
         name:
           updateSubscriptionDto.name ??
@@ -242,7 +251,18 @@ export class SubscriptionService {
     try {
       const updatedPlan = await this.prisma.subscriptionPlan.update({
         where: { id },
-        data: updateSubscriptionDto,
+        data: {
+          ...updateSubscriptionDto,
+          ...(stripeProduct
+            ? {
+                name: stripeProduct.name,
+                description: stripeProduct.description,
+                status: stripeProduct.active
+                  ? SubscriptionPlanStatus.ACTIVE
+                  : SubscriptionPlanStatus.INACTIVE,
+              }
+            : {}),
+        },
       });
 
       return ResponseHelper.success({
@@ -267,7 +287,35 @@ export class SubscriptionService {
   }
 
   async deleteSubscriptionPlan(id: string) {
-    //  TODO: I will add the logic to delete the subscription plan here
+    const plan = await this.prisma.subscriptionPlan.findUnique({
+      where: { id },
+    });
+    if (!plan) {
+      throw new BadRequestException('Subscription plan not found');
+    }
+
+    if (plan.stripe_product_id) {
+      await StripePayment.deactivateProduct(plan.stripe_product_id).catch(
+        () => null,
+      );
+    }
+    if (plan.stripe_price_id) {
+      await StripePayment.deactivatePrice(plan.stripe_price_id).catch(
+        () => null,
+      );
+    }
+
+    const updatedPlan = await this.prisma.subscriptionPlan.update({
+      where: { id },
+      data: {
+        status: SubscriptionPlanStatus.ARCHIVED,
+      },
+    });
+
+    return ResponseHelper.success({
+      message: 'Subscription plan deleted successfully',
+      data: updatedPlan,
+    });
   }
 
   async syncStripeSubscriptionPlans(id: string) {
@@ -384,6 +432,22 @@ export class SubscriptionService {
       }
 
       throw error;
+    }
+  }
+
+  private mapStripeIntervalToPrisma(interval?: string | null): PeriodType {
+    if (!interval) return PeriodType.MONTH;
+    switch (interval.toLowerCase()) {
+      case 'day':
+        return PeriodType.DAY;
+      case 'week':
+        return PeriodType.WEEK;
+      case 'month':
+        return PeriodType.MONTH;
+      case 'year':
+        return PeriodType.YEAR;
+      default:
+        return PeriodType.MONTH;
     }
   }
 }

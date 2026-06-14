@@ -76,19 +76,22 @@ export class PromoCodeService {
     try {
       promoCode = await this.prisma.promoCode.create({
         data: {
-          code,
-          name: dto.name,
-          percent_off: percentOff,
-          duration: dto.type as unknown as PromoCodeDuration,
+          code: promotionCode.code.toUpperCase(),
+          name: coupon.name || null,
+          percent_off: coupon.percent_off || 100,
+          duration: this.mapStripeDurationToPrisma(coupon.duration),
           duration_days: null,
-          duration_in_months:
-            dto.type === PromoCodeTypeDto.REPEATING ? durationMonths : null,
-          max_redemptions: dto.max_redemptions || null,
-          expires_at: expiresAt,
+          duration_in_months: coupon.duration_in_months || null,
+          max_redemptions: promotionCode.max_redemptions || null,
+          expires_at: promotionCode.expires_at
+            ? new Date(promotionCode.expires_at * 1000)
+            : null,
           stripe_coupon_id: coupon.id,
           stripe_promotion_code_id: promotionCode.id,
           created_by_id: adminId,
-          status: PromoCodeStatus.PENDING,
+          status: promotionCode.active
+            ? PromoCodeStatus.ACTIVE
+            : PromoCodeStatus.INACTIVE,
         },
       });
     } catch (error) {
@@ -367,5 +370,11 @@ export class PromoCodeService {
     if (duration === PromoCodeTypeDto.FOREVER) return 'forever';
     if (duration === PromoCodeTypeDto.REPEATING) return 'repeating';
     return 'once';
+  }
+
+  private mapStripeDurationToPrisma(duration: string): PromoCodeDuration {
+    if (duration === 'forever') return PromoCodeDuration.FOREVER;
+    if (duration === 'repeating') return PromoCodeDuration.REPEATING;
+    return PromoCodeDuration.ONCE;
   }
 }

@@ -12,7 +12,7 @@ import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decor
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('admin/garage')
+@Controller('admin/garages')
 export class GarageController {
   constructor(private readonly garageService: GarageService) {}
 
@@ -35,8 +35,8 @@ export class GarageController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Get(':id')
-  getGarageDetails(@Param('id') id: string) {
-    return this.garageService.getGarageDetails(id);
+  @Get(':garage_id')
+  getGarageDetails(@Param('garage_id') garage_id: string) {
+    return this.garageService.getGarageDetails(garage_id);
   }
 }

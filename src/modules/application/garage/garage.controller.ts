@@ -34,7 +34,7 @@ import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decor
 
 @ApiTags('Garage')
 @ApiBearerAuth()
-@Controller('garage')
+@Controller('garages')
 export class GarageController {
   constructor(private readonly garageService: GarageService) {}
 

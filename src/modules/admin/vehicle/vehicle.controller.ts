@@ -15,7 +15,7 @@ import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decor
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('admin/vehicle')
+@Controller('admin/vehicles')
 export class VehicleController {
   constructor(private readonly vehicleService: VehicleService) {}
 
@@ -38,9 +38,9 @@ export class VehicleController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Get(':id')
-  getVehicleById(@Param('id') id: string) {
-    return this.vehicleService.getVehicleById(id);
+  @Get(':vehicle_id')
+  getVehicleById(@Param('vehicle_id') vehicle_id: string) {
+    return this.vehicleService.getVehicleById(vehicle_id);
   }
 
   @ApiSuccessResponse({
@@ -51,9 +51,9 @@ export class VehicleController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Get(':id/history')
+  @Get(':vehicle_id/history')
   getVehicleHistory(
-    @Param('id') vehicle_id: string,
+    @Param('vehicle_id') vehicle_id: string,
     @Query() query: QueryVehicleHistoryDto,
   ) {
     return this.vehicleService.getVehicleHistory(vehicle_id, query);

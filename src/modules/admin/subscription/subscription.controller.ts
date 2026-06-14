@@ -29,7 +29,7 @@ import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decor
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('admin/subscription')
+@Controller('admin/subscriptions')
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
@@ -68,9 +68,9 @@ export class SubscriptionController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Post('plan/:id/stripe/sync')
-  syncStripeSubscriptionPlans(@Param('id') id: string) {
-    return this.subscriptionService.syncStripeSubscriptionPlans(id);
+  @Post('plan/:plan_id/stripe/sync')
+  syncStripeSubscriptionPlans(@Param('plan_id') plan_id: string) {
+    return this.subscriptionService.syncStripeSubscriptionPlans(plan_id);
   }
 
   @ApiSuccessResponse({
@@ -80,9 +80,9 @@ export class SubscriptionController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Get('plan/:id')
-  getOneSubscriptionPlan(@Param('id') id: string) {
-    return this.subscriptionService.getOneSubscriptionPlan(id);
+  @Get('plan/:plan_id')
+  getOneSubscriptionPlan(@Param('plan_id') plan_id: string) {
+    return this.subscriptionService.getOneSubscriptionPlan(plan_id);
   }
 
   @ApiSuccessResponse({
@@ -92,13 +92,13 @@ export class SubscriptionController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Patch('plan/:id')
+  @Patch('plan/:plan_id')
   updateSubscriptionPlan(
-    @Param('id') id: string,
+    @Param('plan_id') plan_id: string,
     @Body() updateSubscriptionDto: UpdateSubscriptionDto,
   ) {
     return this.subscriptionService.updateSubscriptionPlan(
-      id,
+      plan_id,
       updateSubscriptionDto,
     );
   }
@@ -110,8 +110,8 @@ export class SubscriptionController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Delete('plan/:id')
-  deleteSubscriptionPlan(@Param('id') id: string) {
-    return this.subscriptionService.deleteSubscriptionPlan(id);
+  @Delete('plan/:plan_id')
+  deleteSubscriptionPlan(@Param('plan_id') plan_id: string) {
+    return this.subscriptionService.deleteSubscriptionPlan(plan_id);
   }
 }

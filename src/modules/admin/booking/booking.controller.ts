@@ -12,7 +12,7 @@ import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decor
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('admin/booking')
+@Controller('admin/bookings')
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
@@ -35,8 +35,8 @@ export class BookingController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Get(':id')
-  getBookingDetails(@Param('id') id: string) {
-    return this.bookingService.getBookingDetails(id);
+  @Get(':booking_id')
+  getBookingDetails(@Param('booking_id') booking_id: string) {
+    return this.bookingService.getBookingDetails(booking_id);
   }
 }

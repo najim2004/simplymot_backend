@@ -19,7 +19,7 @@ import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decor
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('admin/transaction')
+@Controller('admin/transactions')
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
 
@@ -44,9 +44,12 @@ export class TransactionController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Get(':id')
-  findOne(@Param('id') id: string, @Query() query: QueryTransactionDto) {
-    return this.transactionService.findOne(id, query);
+  @Get(':transaction_id')
+  findOne(
+    @Param('transaction_id') transaction_id: string,
+    @Query() query: QueryTransactionDto,
+  ) {
+    return this.transactionService.findOne(transaction_id, query);
   }
 
   @ApiOperation({ summary: 'Soft-delete a transaction' })
@@ -57,8 +60,11 @@ export class TransactionController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Delete(':id')
-  remove(@Param('id') id: string, @Query() query: QueryTransactionDto) {
-    return this.transactionService.softRemove(id, query);
+  @Delete(':transaction_id')
+  remove(
+    @Param('transaction_id') transaction_id: string,
+    @Query() query: QueryTransactionDto,
+  ) {
+    return this.transactionService.softRemove(transaction_id, query);
   }
 }

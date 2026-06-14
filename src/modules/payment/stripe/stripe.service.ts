@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { StripePayment } from '../../../common/lib/Payment/stripe/StripePayment';
 import { SubscriptionService } from 'src/modules/application/subscription/subscription.service';
-import { CouponRepository } from '../../../common/repository/coupon/coupon.repository';
 import type Stripe from 'stripe';
 
 @Injectable()
@@ -10,33 +9,10 @@ export class StripeService {
 
   constructor(
     private readonly subscriptionService: SubscriptionService,
-    private readonly couponRepository: CouponRepository,
   ) {}
 
   async handleWebhook(rawBody: string, sig: string | string[]) {
     return StripePayment.handleWebhook(rawBody, sig);
-  }
-
-  async handlePromoCodeEvent(event: Stripe.Event) {
-    switch (event.type) {
-      case 'coupon.created':
-      case 'coupon.updated':
-        return await this.couponRepository.syncCoupon(
-          event.data.object as Stripe.Coupon,
-        );
-      case 'coupon.deleted':
-        return await this.couponRepository.deleteCoupon(
-          event.data.object as Stripe.Coupon,
-        );
-      case 'promotion_code.created':
-      case 'promotion_code.updated':
-        return await this.couponRepository.syncPromotionCode(
-          event.data.object as Stripe.PromotionCode,
-        );
-      default:
-        this.logger.debug(`No promo code handler for ${event.type}`);
-        return null;
-    }
   }
 
   async handleSubscriptionEvent(event: Stripe.Event) {

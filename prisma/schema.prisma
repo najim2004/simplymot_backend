@@ -60,6 +60,7 @@ enum NotificationStatus {
 }
 
 enum SubscriptionPlanStatus {
+  PENDING
   ACTIVE
   INACTIVE
   ARCHIVED

@@ -14,7 +14,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
 
 @ApiTags('Booking')
-@Controller('booking')
+@Controller('bookings')
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
@@ -44,9 +44,9 @@ export class BookingController {
     data: { id: 'booking_id' },
     includeNotFound: true,
   })
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.bookingService.findOne(+id);
+  @Get(':bookings_id')
+  findOne(@Param('bookings_id') bookings_id: string) {
+    return this.bookingService.findOne(bookings_id);
   }
 
   @ApiSuccessResponse({
@@ -55,9 +55,12 @@ export class BookingController {
     data: { id: 'booking_id' },
     includeNotFound: true,
   })
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBookingDto: UpdateBookingDto) {
-    return this.bookingService.update(+id, updateBookingDto);
+  @Patch(':bookings_id')
+  update(
+    @Param('bookings_id') bookings_id: string,
+    @Body() updateBookingDto: UpdateBookingDto,
+  ) {
+    return this.bookingService.update(bookings_id, updateBookingDto);
   }
 
   @ApiSuccessResponse({
@@ -66,8 +69,8 @@ export class BookingController {
     data: { id: 'booking_id' },
     includeNotFound: true,
   })
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.bookingService.remove(+id);
+  @Delete(':bookings_id')
+  remove(@Param('bookings_id') bookings_id: string) {
+    return this.bookingService.remove(bookings_id);
   }
 }

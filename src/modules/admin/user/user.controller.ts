@@ -26,7 +26,7 @@ import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decor
 @ApiTags('User')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('admin/user')
+@Controller('admin/users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
@@ -69,9 +69,9 @@ export class UserController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Post(':id/approve')
-  approveUser(@Param('id') id: string) {
-    return this.userService.approveUser(id);
+  @Post(':user_id/approve')
+  approveUser(@Param('user_id') user_id: string) {
+    return this.userService.approveUser(user_id);
   }
 
   // reject user
@@ -84,9 +84,9 @@ export class UserController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Post(':id/reject')
-  rejectUser(@Param('id') id: string) {
-    return this.userService.rejectUser(id);
+  @Post(':user_id/reject')
+  rejectUser(@Param('user_id') user_id: string) {
+    return this.userService.rejectUser(user_id);
   }
   @ApiSuccessResponse({
     summary: 'Ban a user',
@@ -95,9 +95,9 @@ export class UserController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Post(':id/ban')
-  banUser(@Param('id') id: string) {
-    return this.userService.banUser(id);
+  @Post(':user_id/ban')
+  banUser(@Param('user_id') user_id: string) {
+    return this.userService.banUser(user_id);
   }
 
   @ApiSuccessResponse({
@@ -107,9 +107,9 @@ export class UserController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Post(':id/unban')
-  unbanUser(@Param('id') id: string) {
-    return this.userService.unbanUser(id);
+  @Post(':user_id/unban')
+  unbanUser(@Param('user_id') user_id: string) {
+    return this.userService.unbanUser(user_id);
   }
 
   @ApiResponse({ description: 'Get a user by id' })
@@ -120,9 +120,9 @@ export class UserController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Get(':id')
-  findOneUser(@Param('id') id: string) {
-    return this.userService.findOneUser(id);
+  @Get(':user_id')
+  findOneUser(@Param('user_id') user_id: string) {
+    return this.userService.findOneUser(user_id);
   }
 
   @ApiSuccessResponse({
@@ -132,9 +132,12 @@ export class UserController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Patch(':id')
-  updateUser(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.updateUser(id, updateUserDto);
+  @Patch(':user_id')
+  updateUser(
+    @Param('user_id') user_id: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return this.userService.updateUser(user_id, updateUserDto);
   }
 
   @ApiSuccessResponse({
@@ -144,8 +147,8 @@ export class UserController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Delete(':id')
-  deleteUser(@Param('id') id: string) {
-    return this.userService.deleteUser(id);
+  @Delete(':user_id')
+  deleteUser(@Param('user_id') user_id: string) {
+    return this.userService.deleteUser(user_id);
   }
 }
