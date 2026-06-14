@@ -6,14 +6,18 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { BookingService } from './booking.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { User } from 'src/modules/auth/decorators/get-user.decorator';
 
 @ApiTags('Booking')
+@ApiBearerAuth()
 @Controller('bookings')
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
@@ -22,10 +26,15 @@ export class BookingController {
     summary: 'Create booking',
     message: 'Booking created successfully',
     data: { id: 'booking_id' },
+    includeAuthErrors: true,
   })
+  @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Body() createBookingDto: CreateBookingDto) {
-    return this.bookingService.create(createBookingDto);
+  create(
+    @Body() createBookingDto: CreateBookingDto,
+    @User('id') user_id: string,
+  ) {
+    return this.bookingService.create(createBookingDto, user_id);
   }
 
   @ApiSuccessResponse({

@@ -8,6 +8,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 
 type SlotSource = 'DATABASE' | 'TEMPLATE';
 type SlotStatus = TimeSlotStatus;
+type SlotDisplayStatus = SlotStatus | 'PAST';
 
 type SlotWindow = {
   starts_at: Date;
@@ -17,10 +18,10 @@ type SlotWindow = {
 
 type SlotResponse = SlotWindow & {
   id?: string;
-  start_time: string;
-  end_time: string;
   source: SlotSource;
-  status: SlotStatus;
+  status: SlotDisplayStatus;
+  bookable: boolean;
+  description: string | null;
 };
 
 @Injectable()
@@ -122,11 +123,23 @@ export class SlotRepository {
             occupied: [...dbSlots, ...breakSlots],
           });
 
-    const slots = [...dbSlots, ...templateSlots, ...visibleBreakSlots].sort(
-      (first, second) =>
-        first.starts_at.getTime() - second.starts_at.getTime() ||
-        first.ends_at.getTime() - second.ends_at.getTime(),
-    );
+    const now = new Date();
+    const slots = [...dbSlots, ...templateSlots, ...visibleBreakSlots]
+      .sort(
+        (first, second) =>
+          first.starts_at.getTime() - second.starts_at.getTime() ||
+          first.ends_at.getTime() - second.ends_at.getTime(),
+      )
+      .map((slot) => {
+        if (slot.ends_at <= now && slot.status === TimeSlotStatus.AVAILABLE) {
+          return { ...slot, status: 'PAST' as const, bookable: false };
+        }
+
+        return {
+          ...slot,
+          bookable: slot.status === TimeSlotStatus.AVAILABLE,
+        };
+      });
 
     return {
       garage_id: garage.id,
@@ -274,7 +287,23 @@ export class SlotRepository {
           },
         });
 
-    return this.toSlot(updatedSlot, 'DATABASE', updatedSlot.status);
+    const slotResponse = this.toSlot(
+      updatedSlot,
+      'DATABASE',
+      updatedSlot.status,
+    );
+
+    if (
+      slotResponse.ends_at <= new Date() &&
+      slotResponse.status === TimeSlotStatus.AVAILABLE
+    ) {
+      return { ...slotResponse, status: 'PAST' as const, bookable: false };
+    }
+
+    return {
+      ...slotResponse,
+      bookable: slotResponse.status === TimeSlotStatus.AVAILABLE,
+    };
   }
 
   private getBreakSlots(
@@ -370,24 +399,25 @@ export class SlotRepository {
       id: slot.id,
       starts_at: slot.starts_at,
       ends_at: slot.ends_at,
-      start_time: this.formatTime(slot.starts_at),
-      end_time: this.formatTime(slot.ends_at),
       source,
       status,
+      bookable: false,
       description: slot.description ?? null,
     };
   }
 
   private getSummary(slots: SlotResponse[]) {
-    const count = (status: SlotStatus) =>
+    const count = (status: SlotDisplayStatus) =>
       slots.filter((slot) => slot.status === status).length;
 
     return {
       total_slots: slots.length,
+      past_slots: count('PAST'),
       break_slots: count(TimeSlotStatus.BREAK),
       available_slots: count(TimeSlotStatus.AVAILABLE),
       booked_slots: count(TimeSlotStatus.BOOKED),
       blocked_slots: count(TimeSlotStatus.BLOCKED),
+      bookable_slots: slots.filter((slot) => slot.bookable).length,
     };
   }
 
@@ -460,12 +490,6 @@ export class SlotRepository {
       2,
       '0',
     )}-${String(date.getDate()).padStart(2, '0')}`;
-  }
-
-  private formatTime(date: Date): string {
-    return `${String(date.getHours()).padStart(2, '0')}:${String(
-      date.getMinutes(),
-    ).padStart(2, '0')}`;
   }
 
   private formatScheduleTime(time: Date | string): string {
