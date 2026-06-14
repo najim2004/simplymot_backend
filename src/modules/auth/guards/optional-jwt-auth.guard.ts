@@ -18,14 +18,20 @@ export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
   }
 
   canActivate(context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest<{ headers?: { authorization?: string } }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<{ headers?: { authorization?: string } }>();
     if (!this.hasBearerToken(request.headers?.authorization)) {
       return true;
     }
     return super.canActivate(context);
   }
 
-  handleRequest<TUser = unknown>(err: Error, user: TUser, info: unknown): TUser {
+  handleRequest<TUser = unknown>(
+    err: Error,
+    user: TUser,
+    info: unknown,
+  ): TUser {
     if (err || !user) {
       throw err || new UnauthorizedException();
     }

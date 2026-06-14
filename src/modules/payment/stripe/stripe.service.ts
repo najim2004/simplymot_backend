@@ -7,9 +7,7 @@ import type Stripe from 'stripe';
 export class StripeService {
   private readonly logger = new Logger(StripeService.name);
 
-  constructor(
-    private readonly subscriptionService: SubscriptionService,
-  ) {}
+  constructor(private readonly subscriptionService: SubscriptionService) {}
 
   async handleWebhook(rawBody: string, sig: string | string[]) {
     return StripePayment.handleWebhook(rawBody, sig);

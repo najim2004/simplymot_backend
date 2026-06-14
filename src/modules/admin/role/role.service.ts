@@ -9,10 +9,7 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { SetRolePermissionsDto } from './dto/set-role-permissions.dto';
 import { SetRolePermissionsMode } from './dto/set-role-permissions-mode.enum';
-import {
-  IMMUTABLE_ROLE_SLUGS,
-  RESERVED_ROLE_SLUGS,
-} from './role.constants';
+import { IMMUTABLE_ROLE_SLUGS, RESERVED_ROLE_SLUGS } from './role.constants';
 
 const roleListSelect = {
   id: true,
@@ -113,7 +110,11 @@ export class RoleService {
   }
 
   async createRole(dto: CreateRoleDto) {
-    if (RESERVED_ROLE_SLUGS.includes(dto.name as (typeof RESERVED_ROLE_SLUGS)[number])) {
+    if (
+      RESERVED_ROLE_SLUGS.includes(
+        dto.name as (typeof RESERVED_ROLE_SLUGS)[number],
+      )
+    ) {
       throw new BadRequestException('This role name is reserved');
     }
 

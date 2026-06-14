@@ -166,7 +166,8 @@ export class NotificationGateway
   }
 
   private getPayloadUserId(payload: NotificationJwtPayload): string | null {
-    const userId = payload.sub ?? payload.id ?? payload.userId ?? payload.user_id;
+    const userId =
+      payload.sub ?? payload.id ?? payload.userId ?? payload.user_id;
 
     return userId ? String(userId) : null;
   }

@@ -69,7 +69,9 @@ export class CreateBookingDto {
     example: '2026-06-20T09:00:00.000Z',
   })
   @ValidateIf((dto) => !dto.slot_id)
-  @IsNotEmpty({ message: 'start_time is required when slot_id is not provided' })
+  @IsNotEmpty({
+    message: 'start_time is required when slot_id is not provided',
+  })
   @Type(() => Date)
   @IsDate()
   start_time?: Date;

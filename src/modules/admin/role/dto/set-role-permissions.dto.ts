@@ -1,10 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  ArrayNotEmpty,
-  IsArray,
-  IsEnum,
-  IsString,
-} from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsEnum, IsString } from 'class-validator';
 import { SetRolePermissionsMode } from './set-role-permissions-mode.enum';
 
 export class SetRolePermissionsDto {

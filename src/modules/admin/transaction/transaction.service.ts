@@ -34,7 +34,9 @@ export class TransactionService {
     },
   } satisfies Prisma.PaymentTransactionSelect;
 
-  private userWhereFromQuery(query: Pick<QueryTransactionDto, 'user_id' | 'user_kind'>) {
+  private userWhereFromQuery(
+    query: Pick<QueryTransactionDto, 'user_id' | 'user_kind'>,
+  ) {
     const { user_id, user_kind } = query;
     if (!user_id && !user_kind) return undefined;
     return {
@@ -44,8 +46,15 @@ export class TransactionService {
   }
 
   async findAll(query: QueryTransactionDto) {
-    const { page = 1, limit = 10, status, kind, search, user_id, user_kind } =
-      query;
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      kind,
+      search,
+      user_id,
+      user_kind,
+    } = query;
     const where: Prisma.PaymentTransactionWhereInput = {
       deleted_at: null,
     };
@@ -84,7 +93,10 @@ export class TransactionService {
     });
   }
 
-  async findOne(id: string, query: Pick<QueryTransactionDto, 'user_id' | 'user_kind'>) {
+  async findOne(
+    id: string,
+    query: Pick<QueryTransactionDto, 'user_id' | 'user_kind'>,
+  ) {
     const userWhere = this.userWhereFromQuery(query);
     const row = await this.prisma.paymentTransaction.findFirst({
       where: {

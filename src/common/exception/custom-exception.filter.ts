@@ -58,7 +58,7 @@ export class CustomExceptionFilter implements ExceptionFilter {
 
     response.status(status).json(
       ResponseHelper.error({
-      message,
+        message,
         data: details,
         meta_data: {
           timestamp: new Date().toISOString(),

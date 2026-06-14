@@ -57,7 +57,8 @@ export class CreatePromoCodeDto {
 
   @ApiProperty({
     example: 3,
-    description: 'Stripe repeating duration in months (required when type is REPEATING)',
+    description:
+      'Stripe repeating duration in months (required when type is REPEATING)',
   })
   @ValidateIf((dto) => dto.type === PromoCodeTypeDto.REPEATING)
   @IsNotEmpty()

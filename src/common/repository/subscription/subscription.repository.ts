@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { SubscriptionStatus } from 'prisma/generated/enums';
 import { StripePayment } from 'src/common/lib/Payment/stripe/StripePayment';
 import { PrismaService } from 'src/prisma/prisma.service';
 import Stripe from 'stripe';
@@ -39,6 +40,47 @@ export class SubscriptionRepository {
   private readonly logger = new Logger(SubscriptionRepository.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  async hasActiveSubscriptionAccess(user_id: string): Promise<boolean> {
+    const subscription = await this.prisma.subscription.findFirst({
+      where: {
+        user_id,
+        status: {
+          in: [
+            SubscriptionStatus.TRIALING,
+            SubscriptionStatus.ACTIVE,
+            SubscriptionStatus.PAST_DUE,
+            SubscriptionStatus.CANCELLED,
+          ],
+        },
+      },
+      orderBy: { created_at: 'desc' },
+      select: {
+        status: true,
+        current_period_end: true,
+      },
+    });
+
+    if (!subscription) {
+      return false;
+    }
+
+    const periodEnd = subscription.current_period_end
+      ? subscription.current_period_end.getTime()
+      : null;
+    const hasPeriodAccess = periodEnd ? periodEnd > Date.now() : false;
+    const activeStatuses = [
+      SubscriptionStatus.TRIALING,
+      SubscriptionStatus.ACTIVE,
+    ];
+
+    return (
+      activeStatuses.includes(subscription.status) ||
+      (subscription.status === SubscriptionStatus.CANCELLED &&
+        hasPeriodAccess) ||
+      subscription.status === SubscriptionStatus.PAST_DUE
+    );
+  }
 
   // Retrieves the user's latest relevant subscription with a background Stripe sync
   async getCurrentSubscription(user_id: string): Promise<SubscriptionWithPlan> {
@@ -110,7 +152,9 @@ export class SubscriptionRepository {
               subscription.stripe_subscription_id,
             );
           } else {
-            await StripePayment.cancelSubscription(subscription.stripe_subscription_id);
+            await StripePayment.cancelSubscription(
+              subscription.stripe_subscription_id,
+            );
           }
         } catch (error) {
           this.logger.warn(

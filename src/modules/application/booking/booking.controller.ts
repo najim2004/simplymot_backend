@@ -5,12 +5,16 @@ import {
   Body,
   Patch,
   Param,
-  Delete,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { BookingService } from './booking.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
-import { UpdateBookingDto } from './dto/update-booking.dto';
+import { QueryBookingDto } from './dto/query-booking.dto';
+import {
+  CancelBookingDto,
+  RescheduleBookingDto,
+} from './dto/update-booking.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -18,6 +22,7 @@ import { User } from 'src/modules/auth/decorators/get-user.decorator';
 
 @ApiTags('Booking')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('bookings')
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
@@ -28,7 +33,6 @@ export class BookingController {
     data: { id: 'booking_id' },
     includeAuthErrors: true,
   })
-  @UseGuards(JwtAuthGuard)
   @Post()
   create(
     @Body() createBookingDto: CreateBookingDto,
@@ -41,45 +45,65 @@ export class BookingController {
     summary: 'List bookings',
     message: 'Bookings fetched successfully',
     data: [],
+    metaData: { total: 1, page: 1, limit: 10 },
+    includeAuthErrors: true,
   })
   @Get()
-  findAll() {
-    return this.bookingService.findAll();
+  findAllBookings(
+    @Query() query: QueryBookingDto,
+    @User('id') user_id: string,
+  ) {
+    return this.bookingService.findAll(user_id, query);
+  }
+
+  @ApiSuccessResponse({
+    summary: 'Reschedule booking',
+    message: 'Booking rescheduled successfully',
+    data: { id: 'booking_id' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
+  @Patch(':booking_id/reschedule')
+  reschedule(
+    @Param('booking_id') booking_id: string,
+    @Body() rescheduleBookingDto: RescheduleBookingDto,
+    @User('id') user_id: string,
+  ) {
+    return this.bookingService.reschedule(
+      user_id,
+      booking_id,
+      rescheduleBookingDto,
+    );
+  }
+
+  @ApiSuccessResponse({
+    summary: 'Cancel booking',
+    message: 'Booking cancelled successfully',
+    data: { id: 'booking_id', status: 'CANCELLED' },
+    includeAuthErrors: true,
+    includeNotFound: true,
+  })
+  @Patch(':booking_id/cancel')
+  cancel(
+    @Param('booking_id') booking_id: string,
+    @Body() cancelBookingDto: CancelBookingDto,
+    @User('id') user_id: string,
+  ) {
+    return this.bookingService.cancel(user_id, booking_id, cancelBookingDto);
   }
 
   @ApiSuccessResponse({
     summary: 'Get booking',
     message: 'Booking fetched successfully',
     data: { id: 'booking_id' },
+    includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Get(':bookings_id')
-  findOne(@Param('bookings_id') bookings_id: string) {
-    return this.bookingService.findOne(bookings_id);
-  }
-
-  @ApiSuccessResponse({
-    summary: 'Update booking',
-    message: 'Booking updated successfully',
-    data: { id: 'booking_id' },
-    includeNotFound: true,
-  })
-  @Patch(':bookings_id')
-  update(
-    @Param('bookings_id') bookings_id: string,
-    @Body() updateBookingDto: UpdateBookingDto,
+  @Get(':booking_id')
+  findOneBooking(
+    @Param('booking_id') booking_id: string,
+    @User('id') user_id: string,
   ) {
-    return this.bookingService.update(bookings_id, updateBookingDto);
-  }
-
-  @ApiSuccessResponse({
-    summary: 'Delete booking',
-    message: 'Booking deleted successfully',
-    data: { id: 'booking_id' },
-    includeNotFound: true,
-  })
-  @Delete(':bookings_id')
-  remove(@Param('bookings_id') bookings_id: string) {
-    return this.bookingService.remove(bookings_id);
+    return this.bookingService.findOne(user_id, booking_id);
   }
 }

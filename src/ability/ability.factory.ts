@@ -22,7 +22,10 @@ export type AppSubjects = Subjects<{
 
 type AppAbility = PureAbility<[string, AppSubjects], PrismaQuery>;
 
-function doCan(can, permissionRoles: { permission: { action: string; subject: string } }) {
+function doCan(
+  can,
+  permissionRoles: { permission: { action: string; subject: string } },
+) {
   const action = permissionRoles.permission.action;
   const subject = permissionRoles.permission.subject;
   if (!action || !subject) return;

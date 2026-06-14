@@ -53,7 +53,9 @@ export class AppCacheService {
         await this.redis.del(...keys);
       }
     } catch (error) {
-      this.logger.warn(`Cache pattern delete failed for ${pattern}: ${error.message}`);
+      this.logger.warn(
+        `Cache pattern delete failed for ${pattern}: ${error.message}`,
+      );
     }
   }
 

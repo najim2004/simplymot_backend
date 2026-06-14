@@ -128,7 +128,10 @@ export default () => ({
       /** Cron pattern (BullMQ repeat). Default: 03:15 Europe/London */
       cronPattern: process.env.SUBSCRIPTION_RECONCILE_CRON || '15 3 * * *',
       timezone: process.env.SUBSCRIPTION_RECONCILE_TZ || 'Europe/London',
-      batchSize: parseInt(process.env.SUBSCRIPTION_RECONCILE_BATCH_SIZE || '40', 10),
+      batchSize: parseInt(
+        process.env.SUBSCRIPTION_RECONCILE_BATCH_SIZE || '40',
+        10,
+      ),
       /** Parallel Stripe.retrieveSubscription calls inside one batch */
       stripeConcurrency: parseInt(
         process.env.SUBSCRIPTION_RECONCILE_STRIPE_CONCURRENCY || '5',
