@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Max,
@@ -11,7 +12,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-export enum PromoCodeDurationDto {
+export enum PromoCodeTypeDto {
   ONCE = 'ONCE',
   REPEATING = 'REPEATING',
   FOREVER = 'FOREVER',
@@ -48,34 +49,21 @@ export class CreatePromoCodeDto {
   percent_off?: number;
 
   @ApiProperty({
-    enum: PromoCodeDurationDto,
-    example: PromoCodeDurationDto.REPEATING,
+    enum: PromoCodeTypeDto,
+    example: PromoCodeTypeDto.REPEATING,
   })
-  @IsEnum(PromoCodeDurationDto)
-  duration: PromoCodeDurationDto;
+  @IsEnum(PromoCodeTypeDto)
+  type: PromoCodeTypeDto;
 
-  @ApiPropertyOptional({
-    example: 90,
-    description:
-      'Business duration in days. Stripe repeating coupons use months, so this is converted.',
-  })
-  @ValidateIf((dto) => dto.duration === PromoCodeDurationDto.REPEATING)
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(1825)
-  duration_days?: number;
-
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: 3,
-    description: 'Optional direct Stripe repeating duration in months',
+    description: 'Stripe repeating duration in months (required when type is REPEATING)',
   })
-  @ValidateIf((dto) => dto.duration === PromoCodeDurationDto.REPEATING)
-  @IsOptional()
+  @ValidateIf((dto) => dto.type === PromoCodeTypeDto.REPEATING)
+  @IsNotEmpty()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(60)
   duration_in_months?: number;
 
   @ApiPropertyOptional({ example: 25 })

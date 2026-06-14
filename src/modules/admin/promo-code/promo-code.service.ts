@@ -8,14 +8,14 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ResponseHelper } from 'src/common/helper/response.helper';
 import { StripePayment } from 'src/common/lib/Payment/stripe/StripePayment';
-import { PromoCodeDuration } from 'prisma/generated/enums';
+import { PromoCodeDuration, PromoCodeStatus } from 'prisma/generated/enums';
 import { Prisma } from 'prisma/generated/client';
 import {
   CreatePromoCodeDto,
-  PromoCodeDurationDto,
+  PromoCodeTypeDto,
 } from './dto/create-promo-code.dto';
 
-type PromoCodeStatus = 'active' | 'inactive' | 'expired';
+type PromoCodeFilterStatus = 'active' | 'inactive' | 'expired';
 
 @Injectable()
 export class PromoCodeService {
@@ -35,15 +35,17 @@ export class PromoCodeService {
       throw new ConflictException('Promo code already exists');
     }
 
-    const durationDays =
-      dto.duration === PromoCodeDurationDto.REPEATING
-        ? dto.duration_days || 90
-        : undefined;
+    if (dto.type === PromoCodeTypeDto.REPEATING && !dto.duration_in_months) {
+      throw new BadRequestException(
+        'duration_in_months is required for repeating promo codes',
+      );
+    }
+
     const durationMonths =
-      dto.duration === PromoCodeDurationDto.REPEATING
-        ? dto.duration_in_months ||
-          Math.max(1, Math.ceil((durationDays || 90) / 30))
+      dto.type === PromoCodeTypeDto.REPEATING
+        ? dto.duration_in_months
         : undefined;
+
     const expiresAt = dto.expires_at ? new Date(dto.expires_at) : undefined;
 
     if (expiresAt && expiresAt.getTime() <= Date.now()) {
@@ -53,7 +55,7 @@ export class PromoCodeService {
     const coupon = await StripePayment.createCoupon({
       name: dto.name || code,
       percent_off: percentOff,
-      duration: this.toStripeDuration(dto.duration),
+      duration: this.toStripeDuration(dto.type),
       duration_in_months: durationMonths,
     });
 
@@ -77,17 +79,16 @@ export class PromoCodeService {
           code,
           name: dto.name,
           percent_off: percentOff,
-          duration: dto.duration as PromoCodeDuration,
-          duration_days: durationDays || null,
+          duration: dto.type as unknown as PromoCodeDuration,
+          duration_days: null,
           duration_in_months:
-            dto.duration === PromoCodeDurationDto.REPEATING
-              ? durationMonths
-              : null,
+            dto.type === PromoCodeTypeDto.REPEATING ? durationMonths : null,
           max_redemptions: dto.max_redemptions || null,
           expires_at: expiresAt,
           stripe_coupon_id: coupon.id,
           stripe_promotion_code_id: promotionCode.id,
           created_by_id: adminId,
+          status: PromoCodeStatus.PENDING,
         },
       });
     } catch (error) {
@@ -108,7 +109,7 @@ export class PromoCodeService {
     limit = 20,
     search?: string,
     filters?: {
-      status?: PromoCodeStatus;
+      status?: PromoCodeFilterStatus;
       dateFrom?: string;
       dateTo?: string;
     },
@@ -129,19 +130,26 @@ export class PromoCodeService {
     }
 
     if (filters?.status === 'active') {
-      where.is_active = true;
+      where.status = PromoCodeStatus.ACTIVE;
       andFilters.push({
         OR: [{ expires_at: null }, { expires_at: { gt: now } }],
       });
     }
 
     if (filters?.status === 'inactive') {
-      where.is_active = false;
+      where.status = PromoCodeStatus.INACTIVE;
     }
 
     if (filters?.status === 'expired') {
-      where.is_active = true;
-      where.expires_at = { lte: now };
+      andFilters.push({
+        OR: [
+          { status: PromoCodeStatus.EXPIRED },
+          {
+            status: PromoCodeStatus.ACTIVE,
+            expires_at: { lte: now },
+          },
+        ],
+      });
     }
 
     const dateFilter: Prisma.DateTimeFilter = {};
@@ -191,7 +199,7 @@ export class PromoCodeService {
       throw new NotFoundException('Promo code not found');
     }
 
-    if (promo.is_active) {
+    if (promo.status === PromoCodeStatus.ACTIVE) {
       await StripePayment.deactivatePromotionCode(
         promo.stripe_promotion_code_id,
       );
@@ -199,7 +207,7 @@ export class PromoCodeService {
 
     const updatedPromo = await this.prisma.promoCode.update({
       where: { id },
-      data: { is_active: false },
+      data: { status: PromoCodeStatus.INACTIVE },
     });
 
     return ResponseHelper.success({
@@ -216,10 +224,14 @@ export class PromoCodeService {
       where: { code: normalizedCode },
     });
 
-    if (!promo || !promo.is_active) {
+    if (!promo || promo.status !== PromoCodeStatus.ACTIVE) {
       throw new BadRequestException('Invalid or inactive promo code');
     }
     if (promo.expires_at && promo.expires_at.getTime() <= Date.now()) {
+      await this.prisma.promoCode.update({
+        where: { id: promo.id },
+        data: { status: PromoCodeStatus.EXPIRED },
+      });
       throw new BadRequestException('Promo code has expired');
     }
     if (
@@ -233,10 +245,21 @@ export class PromoCodeService {
       promo.stripe_promotion_code_id,
     );
 
+    let nextStatus: PromoCodeStatus = stripePromo.active
+      ? PromoCodeStatus.ACTIVE
+      : PromoCodeStatus.INACTIVE;
+    if (
+      nextStatus === PromoCodeStatus.ACTIVE &&
+      stripePromo.expires_at &&
+      stripePromo.expires_at * 1000 <= Date.now()
+    ) {
+      nextStatus = PromoCodeStatus.EXPIRED;
+    }
+
     await this.prisma.promoCode.update({
       where: { id: promo.id },
       data: {
-        is_active: stripePromo.active,
+        status: nextStatus,
         redeemed_count: stripePromo.times_redeemed || promo.redeemed_count,
       },
     });
@@ -271,12 +294,23 @@ export class PromoCodeService {
       const stripePromo =
         await StripePayment.retrievePromotionCode(promotionCodeId);
 
+      let nextStatus: PromoCodeStatus = stripePromo.active
+        ? PromoCodeStatus.ACTIVE
+        : PromoCodeStatus.INACTIVE;
+      if (
+        nextStatus === PromoCodeStatus.ACTIVE &&
+        stripePromo.expires_at &&
+        stripePromo.expires_at * 1000 <= Date.now()
+      ) {
+        nextStatus = PromoCodeStatus.EXPIRED;
+      }
+
       await this.prisma.promoCode.update({
         where: { id: promo.id },
         data: {
           redeemed_count:
             stripePromo.times_redeemed || promo.redeemed_count + 1,
-          is_active: stripePromo.active,
+          status: nextStatus,
         },
       });
     } catch (error) {
@@ -290,11 +324,10 @@ export class PromoCodeService {
   private formatPromo(promo: Prisma.PromoCodeGetPayload<object>) {
     const isExpired =
       promo.expires_at && new Date(promo.expires_at).getTime() <= Date.now();
-    const status = !promo.is_active
-      ? 'INACTIVE'
-      : isExpired
-        ? 'EXPIRED'
-        : 'ACTIVE';
+    let status = promo.status;
+    if (status === PromoCodeStatus.ACTIVE && isExpired) {
+      status = PromoCodeStatus.EXPIRED;
+    }
     const repeatingDays =
       promo.duration_days || (promo.duration_in_months || 0) * 30;
 
@@ -330,9 +363,9 @@ export class PromoCodeService {
     return `${normalizedPrefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
   }
 
-  private toStripeDuration(duration: PromoCodeDurationDto) {
-    if (duration === PromoCodeDurationDto.FOREVER) return 'forever';
-    if (duration === PromoCodeDurationDto.REPEATING) return 'repeating';
+  private toStripeDuration(duration: PromoCodeTypeDto) {
+    if (duration === PromoCodeTypeDto.FOREVER) return 'forever';
+    if (duration === PromoCodeTypeDto.REPEATING) return 'repeating';
     return 'once';
   }
 }

@@ -90,6 +90,13 @@ enum PromoCodeDuration {
   FOREVER
 }
 
+enum PromoCodeStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
 enum BookingStatus {
   PENDING
   ACCEPTED
@@ -685,15 +692,15 @@ model PromoCode {
   duration_days      Int?
   duration_in_months Int?
   max_redemptions    Int?
-  redeemed_count     Int       @default(0)
+  redeemed_count     Int               @default(0)
   expires_at         DateTime?
-  is_active          Boolean   @default(true)
+  status             PromoCodeStatus   @default(PENDING)
 
   stripe_coupon_id         String
-  stripe_promotion_code_id String  @unique
+  stripe_promotion_code_id String            @unique
   created_by_id            String?
 
-  @@index([is_active])
+  @@index([status])
   @@index([duration])
   @@map("promo_codes")
 }
