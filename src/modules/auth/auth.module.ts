@@ -11,6 +11,7 @@ import { MailModule } from '../../mail/mail.module';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
+import { SubscriptionModule } from '../application/subscription/subscription.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
     }),
     PrismaModule,
     MailModule,
+    SubscriptionModule,
   ],
   controllers: [AuthController],
   providers: [

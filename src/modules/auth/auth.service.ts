@@ -32,12 +32,12 @@ import {
   CheckOTPValidationDto,
 } from './dto/auth.dto';
 import {
-  SubscriptionStatus,
   UserAccountStatus,
   UserKind,
 } from 'prisma/generated/enums';
 import { Prisma } from 'prisma/generated/client';
 import { PostCodeMapRepository } from 'src/common/repository/post-code-map/post-code-map.repository';
+import { SubscriptionService } from '../application/subscription/subscription.service';
 
 @Injectable()
 export class AuthService {
@@ -50,6 +50,7 @@ export class AuthService {
     private userRepository: UserRepository,
     private ucodeRepository: UcodeRepository,
     private postCodeMapRepository: PostCodeMapRepository,
+    private subscriptionService: SubscriptionService,
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
@@ -60,122 +61,117 @@ export class AuthService {
   async me(id: string) {
     const cacheKey = this.getProfileCacheKey(id);
     const cachedUser = await this.redis.get(cacheKey);
+    let user: Record<string, unknown>;
 
     if (cachedUser) {
-      return {
-        success: true,
-        data: JSON.parse(cachedUser),
-      };
-    }
-
-    const user = await this.prisma.user.findFirst({
-      where: {
-        id,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        avatar: true,
-        address: true,
-        phone_number: true,
-        kind: true,
-        garages: {
-          select: {
-            id: true,
-            garage_name: true,
-            vts_number: true,
-            contact_email: true,
-            phone_number: true,
-          },
-          take: 1,
-        },
-        created_at: true,
-        email_verified_at: true,
-        status: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    if (user.avatar) {
-      user['avatar_url'] = SojebStorage.url(
-        appConfig().storageUrl.avatar + user.avatar,
-      );
-    }
-
-    let userRoles = [];
-
-    if (user.kind == UserKind.ADMIN) {
-      const roleUsers = await this.prisma.roleUser.findMany({
+      user = JSON.parse(cachedUser);
+    } else {
+      const dbUser = await this.prisma.user.findFirst({
         where: {
-          user_id: id,
+          id,
         },
         select: {
-          role: {
+          id: true,
+          name: true,
+          email: true,
+          avatar: true,
+          address: true,
+          phone_number: true,
+          kind: true,
+          garages: {
             select: {
               id: true,
-              title: true,
-              name: true,
-              permission_roles: {
-                select: {
-                  permission: {
-                    select: {
-                      id: true,
-                      title: true,
-                      action: true,
-                      subject: true,
-                      conditions: true,
-                      fields: true,
+              garage_name: true,
+              vts_number: true,
+              contact_email: true,
+              phone_number: true,
+            },
+            take: 1,
+          },
+          created_at: true,
+          email_verified_at: true,
+          status: true,
+        },
+      });
+
+      if (!dbUser) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (dbUser.avatar) {
+        dbUser['avatar_url'] = SojebStorage.url(
+          appConfig().storageUrl.avatar + dbUser.avatar,
+        );
+      }
+
+      let userRoles = [];
+
+      if (dbUser.kind == UserKind.ADMIN) {
+        const roleUsers = await this.prisma.roleUser.findMany({
+          where: {
+            user_id: id,
+          },
+          select: {
+            role: {
+              select: {
+                id: true,
+                title: true,
+                name: true,
+                permission_roles: {
+                  select: {
+                    permission: {
+                      select: {
+                        id: true,
+                        title: true,
+                        action: true,
+                        subject: true,
+                        conditions: true,
+                        fields: true,
+                      },
                     },
                   },
                 },
               },
             },
           },
-        },
-      });
+        });
 
-      userRoles = roleUsers.map((roleUser) => {
-        return {
-          id: roleUser.role.id,
-          title: roleUser.role.title,
-          name: roleUser.role.name,
-          permissions: roleUser.role.permission_roles.map((permissionRole) => {
-            return {
-              id: permissionRole.permission.id,
-              title: permissionRole.permission.title,
-              action: permissionRole.permission.action,
-              subject: permissionRole.permission.subject,
-              conditions: permissionRole.permission.conditions,
-              fields: permissionRole.permission.fields,
-            };
-          }),
-        };
-      });
+        userRoles = roleUsers.map((roleUser) => {
+          return {
+            id: roleUser.role.id,
+            title: roleUser.role.title,
+            name: roleUser.role.name,
+            permissions: roleUser.role.permission_roles.map((permissionRole) => {
+              return {
+                id: permissionRole.permission.id,
+                title: permissionRole.permission.title,
+                action: permissionRole.permission.action,
+                subject: permissionRole.permission.subject,
+                conditions: permissionRole.permission.conditions,
+                fields: permissionRole.permission.fields,
+              };
+            }),
+          };
+        });
+      }
+
+      user = {
+        ...dbUser,
+        ...(userRoles.length > 0 ? { roles: userRoles } : {}),
+      };
+
+      await this.redis.set(
+        cacheKey,
+        JSON.stringify(user),
+        'EX',
+        AuthService.PROFILE_CACHE_TTL_SECONDS,
+      );
     }
 
-    if (user.kind == UserKind.GARAGE) {
-      const subscription = await this.prisma.subscription.findFirst({
-        where: {
-          user_id: id,
-          status: SubscriptionStatus.ACTIVE,
-        },
-        select: {
-          id: true,
-          status: true,
-        },
-      });
+    if (user.kind === UserKind.GARAGE) {
+      user.subscription =
+        await this.subscriptionService.getActiveSubscriptionSummary(id);
     }
-
-    await this.redis.set(
-      cacheKey,
-      JSON.stringify(user),
-      'EX',
-      AuthService.PROFILE_CACHE_TTL_SECONDS,
-    );
 
     return {
       success: true,

@@ -17,11 +17,9 @@ import {
 } from 'prisma/generated/enums';
 import { Prisma } from 'prisma/generated/client';
 import type Stripe from 'stripe';
-import {
-  CancelSubscriptionDto,
-  QueryAvailableSubscriptionPlansDto,
-  SubscriptionCheckoutDto,
-} from './dto/create-subscription.dto';
+import { CreateSubscriptionDto } from './dto/create-subscription.dto';
+import { QuerySubscriptionDto } from './dto/query-subscription.dto';
+import { CancelSubscriptionDto } from './dto/update-subscription.dto';
 import { PromoCodeService } from 'src/modules/admin/promo-code/promo-code.service';
 
 type SubscriptionWithPlan = Prisma.SubscriptionGetPayload<{
@@ -48,7 +46,9 @@ export class SubscriptionService {
     private readonly promoCodeService: PromoCodeService,
   ) {}
 
-  async getAvailablePlans(query: QueryAvailableSubscriptionPlansDto = {}) {
+  async getActivePlans(user_id: string, query: QuerySubscriptionDto = {}) {
+    await this.ensureGarageUser(user_id);
+
     const page = Math.max(Number(query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 50);
 
@@ -56,6 +56,12 @@ export class SubscriptionService {
       status: SubscriptionPlanStatus.ACTIVE,
       is_legacy_price: false,
     };
+
+    const userSubscription = await this.prisma.subscription.findFirst({
+      where: { user_id },
+      include: this.subscriptionInclude(),
+      orderBy: { created_at: 'desc' },
+    });
 
     const [plans, total] = await Promise.all([
       this.prisma.subscriptionPlan.findMany({
@@ -89,6 +95,10 @@ export class SubscriptionService {
         period_type: plan.period_type,
         trial_period_days: plan.trial_period_days,
         is_checkout_ready: Boolean(plan.stripe_price_id),
+        current_subscription:
+          userSubscription && userSubscription.plan_id === plan.id
+            ? this.formatSubscription(userSubscription)
+            : null,
       })),
       meta_data: {
         page,
@@ -98,36 +108,96 @@ export class SubscriptionService {
     });
   }
 
-  async getCurrentSubscription(user_id: string) {
+  async getSubscriptionStatus(user_id: string) {
     await this.ensureGarageUser(user_id);
 
-    const subscription = await this.findLatestSubscription(user_id);
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { user_id },
+      include: this.subscriptionInclude(),
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (!subscription) {
+      return ResponseHelper.success({
+        message: 'No subscription found',
+        data: {
+          has_subscription: false,
+          subscription: null,
+        },
+      });
+    }
+
+    const statusDetails = this.getStatusDetails(subscription);
 
     return ResponseHelper.success({
-      message: subscription
-        ? 'Subscription fetched successfully'
-        : 'No subscription found',
-      data: subscription ? this.formatSubscription(subscription) : null,
+      message: 'Subscription status fetched successfully',
+      data: {
+        has_subscription: statusDetails.has_access,
+        subscription: {
+          id: subscription.id,
+          status: subscription.status,
+          plan_id: subscription.plan.id,
+          plan_name: subscription.plan.name,
+          price_pence: subscription.price_pence,
+          currency: subscription.currency || subscription.plan.currency,
+          price_formatted: this.formatPrice(
+            subscription.price_pence,
+            subscription.currency || subscription.plan.currency,
+          ),
+          has_access: statusDetails.has_access,
+          current_period_end: subscription.current_period_end,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+        },
+      },
     });
   }
 
-  async createCheckoutSession(
-    user_id: string,
-    checkoutDto: SubscriptionCheckoutDto,
-  ) {
+  async getActiveSubscriptionSummary(user_id: string) {
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { user_id },
+      include: this.subscriptionInclude(),
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (!subscription) {
+      return null;
+    }
+
+    const statusDetails = this.getStatusDetails(subscription);
+    if (!statusDetails.has_access) {
+      return null;
+    }
+
+    return {
+      id: subscription.id,
+      status: subscription.status,
+      plan_id: subscription.plan.id,
+      plan_name: subscription.plan.name,
+      has_access: statusDetails.has_access,
+      current_period_end: subscription.current_period_end,
+      cancel_at_period_end: subscription.cancel_at_period_end,
+    };
+  }
+
+  async subscribe(user_id: string, createSubscriptionDto: CreateSubscriptionDto) {
     const user = await this.ensureGarageUser(user_id);
 
     const existingSubscription =
       await this.findActiveAccessSubscription(user_id);
+
     if (existingSubscription) {
+      if (existingSubscription.plan_id === createSubscriptionDto.plan_id) {
+        throw new ConflictException('You are already subscribed to this plan');
+      }
+
       throw new ConflictException(
-        'You already have an active subscription. Please manage or cancel it before starting a new one.',
+        'You already have an active subscription. Cancel it before subscribing to a different plan.',
       );
     }
 
     const plan = await this.prisma.subscriptionPlan.findFirst({
       where: {
-        id: checkoutDto.plan_id,
+        id: createSubscriptionDto.plan_id,
         status: SubscriptionPlanStatus.ACTIVE,
         is_legacy_price: false,
       },
@@ -144,7 +214,7 @@ export class SubscriptionService {
 
     const stripeCustomerId = await this.getOrCreateStripeCustomer(user);
     const promoCode = await this.promoCodeService.validateForRedemption(
-      checkoutDto.promo_code,
+      createSubscriptionDto.promo_code,
     );
 
     const subscription = await this.getOrCreatePendingCheckoutSubscription({
@@ -246,27 +316,44 @@ export class SubscriptionService {
       );
     }
 
-    const stripeSubscription =
-      await StripePayment.cancelSubscriptionAtPeriodEnd(
-        subscription.stripe_subscription_id,
-      );
+    const cancelImmediately = dto.cancel_immediately === true;
+
+    const stripeSubscription = cancelImmediately
+      ? await StripePayment.cancelSubscription(
+          subscription.stripe_subscription_id,
+        )
+      : await StripePayment.cancelSubscriptionAtPeriodEnd(
+          subscription.stripe_subscription_id,
+        );
     const periods = this.extractStripePeriods(stripeSubscription);
 
     const updatedSubscription = await this.prisma.subscription.update({
       where: { id: subscription.id },
-      data: {
-        cancel_at_period_end: true,
-        cancel_at: stripeSubscription.cancel_at
-          ? new Date(stripeSubscription.cancel_at * 1000)
-          : periods.current_period_end,
-        cancellation_reason: dto.reason ?? null,
-        current_period_start:
-          periods.current_period_start ?? subscription.current_period_start,
-        current_period_end:
-          periods.current_period_end ?? subscription.current_period_end,
-        next_billing_date:
-          periods.current_period_end ?? subscription.next_billing_date,
-      },
+      data: cancelImmediately
+        ? {
+            status: SubscriptionStatus.CANCELLED,
+            cancel_at_period_end: false,
+            cancel_at: new Date(),
+            cancellation_reason: dto.reason ?? null,
+            current_period_start:
+              periods.current_period_start ?? subscription.current_period_start,
+            current_period_end:
+              periods.current_period_end ?? subscription.current_period_end,
+            next_billing_date: null,
+          }
+        : {
+            cancel_at_period_end: true,
+            cancel_at: stripeSubscription.cancel_at
+              ? new Date(stripeSubscription.cancel_at * 1000)
+              : periods.current_period_end,
+            cancellation_reason: dto.reason ?? null,
+            current_period_start:
+              periods.current_period_start ?? subscription.current_period_start,
+            current_period_end:
+              periods.current_period_end ?? subscription.current_period_end,
+            next_billing_date:
+              periods.current_period_end ?? subscription.next_billing_date,
+          },
       include: {
         plan: {
           select: {
@@ -281,15 +368,17 @@ export class SubscriptionService {
     });
 
     return ResponseHelper.success({
-      message:
-        'Subscription cancellation scheduled for the end of the current billing period',
+      message: cancelImmediately
+        ? 'Subscription cancelled immediately'
+        : 'Subscription cancellation scheduled for the end of the current billing period',
       data: {
         subscription: this.formatSubscription(updatedSubscription),
-        effective_date:
-          updatedSubscription.cancel_at ||
-          updatedSubscription.current_period_end ||
-          new Date(),
-        cancelled_immediately: false,
+        effective_date: cancelImmediately
+          ? new Date()
+          : updatedSubscription.cancel_at ||
+            updatedSubscription.current_period_end ||
+            new Date(),
+        cancelled_immediately: cancelImmediately,
       },
     });
   }

@@ -1,46 +1,45 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { User } from 'src/modules/auth/decorators/get-user.decorator';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { SubscriptionService } from './subscription.service';
-import {
-  CancelSubscriptionDto,
-  QueryAvailableSubscriptionPlansDto,
-  SubscriptionCheckoutDto,
-} from './dto/create-subscription.dto';
+import { CreateSubscriptionDto } from './dto/create-subscription.dto';
+import { QuerySubscriptionDto } from './dto/query-subscription.dto';
+import { CancelSubscriptionDto } from './dto/update-subscription.dto';
 import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
 
 @ApiTags('Subscription')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('subscription')
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
   @ApiSuccessResponse({
-    summary: 'List available subscription plans',
+    summary: 'List active subscription plans',
     message: 'Subscription plans fetched successfully',
     data: [],
     metaData: { page: 1, limit: 20, total: 1 },
-  })
-  @Get('plans')
-  getAvailablePlans(@Query() query: QueryAvailableSubscriptionPlansDto) {
-    return this.subscriptionService.getAvailablePlans(query);
-  }
-
-  @ApiSuccessResponse({
-    summary: 'Get current subscription',
-    message: 'Subscription fetched successfully',
-    data: { id: 'subscription_id', status: 'ACTIVE' },
     includeAuthErrors: true,
   })
-  @Get('me')
-  @UseGuards(JwtAuthGuard)
-  getCurrentSubscription(@User('id') user_id: string) {
-    return this.subscriptionService.getCurrentSubscription(user_id);
+  @Get('plans')
+  getActivePlans(
+    @Query() query: QuerySubscriptionDto,
+    @User('id') user_id: string,
+  ) {
+    return this.subscriptionService.getActivePlans(user_id, query);
   }
 
   @ApiSuccessResponse({
-    summary: 'Create subscription checkout session',
+    summary: 'Subscribe or resubscribe',
     message: 'Subscription checkout session created successfully',
     data: {
       checkout_url: 'https://checkout.stripe.com/c/pay/cs_test_xxx',
@@ -49,31 +48,28 @@ export class SubscriptionController {
     },
     includeAuthErrors: true,
   })
-  @Post('checkout')
-  @UseGuards(JwtAuthGuard)
-  createCheckoutSession(
+  @Put()
+  subscribe(
+    @Body() createSubscriptionDto: CreateSubscriptionDto,
     @User('id') user_id: string,
-    @Body() checkoutDto: SubscriptionCheckoutDto,
   ) {
-    return this.subscriptionService.createCheckoutSession(user_id, checkoutDto);
+    return this.subscriptionService.subscribe(user_id, createSubscriptionDto);
   }
 
   @ApiSuccessResponse({
-    summary: 'Create billing portal session',
-    message: 'Billing portal session created successfully',
-    data: { url: 'https://billing.stripe.com/session/test' },
+    summary: 'Get subscription status',
+    message: 'Subscription status fetched successfully',
+    data: { has_subscription: true },
     includeAuthErrors: true,
   })
-  @Post('billing-portal')
-  @UseGuards(JwtAuthGuard)
-  createBillingPortalSession(@User('id') user_id: string) {
-    return this.subscriptionService.createBillingPortalSession(user_id);
+  @Get('status')
+  getSubscriptionStatus(@User('id') user_id: string) {
+    return this.subscriptionService.getSubscriptionStatus(user_id);
   }
 
   @ApiSuccessResponse({
     summary: 'Cancel subscription',
-    message:
-      'Subscription cancellation scheduled for the end of the current billing period',
+    message: 'Subscription cancelled successfully',
     data: {
       subscription: { id: 'subscription_id' },
       cancelled_immediately: false,
@@ -81,13 +77,15 @@ export class SubscriptionController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Post('cancel')
-  @UseGuards(JwtAuthGuard)
+  @Patch('cancel')
   cancelSubscription(
     @User('id') user_id: string,
-    @Body() cancelDto: CancelSubscriptionDto,
+    @Body() cancelSubscriptionDto: CancelSubscriptionDto,
   ) {
-    return this.subscriptionService.cancelSubscription(user_id, cancelDto);
+    return this.subscriptionService.cancelSubscription(
+      user_id,
+      cancelSubscriptionDto,
+    );
   }
 
   @ApiSuccessResponse({
