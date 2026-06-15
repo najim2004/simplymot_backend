@@ -40,6 +40,7 @@ type VisibilityStatus = {
 @Injectable()
 export class SubscriptionRepository {
   private readonly logger = new Logger(SubscriptionRepository.name);
+  private readonly gracePeriodDays = 3;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -457,6 +458,135 @@ export class SubscriptionRepository {
     return subscription;
   }
 
+  async applySubscriptionPaymentFailure(
+    stripeSubscription: Stripe.Subscription,
+    hints: {
+      subscription_id?: string | null;
+      user_id?: string | null;
+      plan_id?: string | null;
+      stripe_invoice_id?: string | null;
+      amount_due_cents?: number | null;
+      currency?: string | null;
+    } = {},
+  ) {
+    const stripeSubscriptionId = stripeSubscription.id;
+    const stripeCustomerId = this.getStripeCustomerId(stripeSubscription);
+    const periods = this.extractStripePeriods(stripeSubscription);
+    const stripeMappedStatus = this.mapStripeStatus(stripeSubscription.status);
+
+    const localSubscription =
+      (hints.subscription_id
+        ? await this.prisma.subscription.findUnique({
+            where: { id: hints.subscription_id },
+          })
+        : null) ||
+      (await this.prisma.subscription.findFirst({
+        where: { stripe_subscription_id: stripeSubscriptionId },
+      }));
+
+    if (!localSubscription) {
+      throw new NotFoundException('Local subscription record not found');
+    }
+
+    const previousStatus = localSubscription.status;
+    let nextStatus: SubscriptionStatus = stripeMappedStatus;
+
+    if (stripeSubscription.status === 'unpaid') {
+      nextStatus = SubscriptionStatus.UNPAID;
+    }
+
+    const wasPastDue = previousStatus === SubscriptionStatus.PAST_DUE;
+    if (
+      wasPastDue &&
+      nextStatus === SubscriptionStatus.PAST_DUE &&
+      this.isGracePeriodExpired(localSubscription.updated_at)
+    ) {
+      nextStatus = SubscriptionStatus.SUSPENDED;
+    }
+
+    const preserveGraceStart =
+      wasPastDue &&
+      nextStatus === SubscriptionStatus.PAST_DUE &&
+      stripeMappedStatus === SubscriptionStatus.PAST_DUE;
+
+    const subscription = await this.prisma.subscription.update({
+      where: { id: localSubscription.id },
+      data: {
+        status: nextStatus,
+        stripe_subscription_id: stripeSubscriptionId,
+        stripe_customer_id: stripeCustomerId ?? localSubscription.stripe_customer_id,
+        current_period_start:
+          periods.current_period_start ?? localSubscription.current_period_start,
+        current_period_end:
+          periods.current_period_end ?? localSubscription.current_period_end,
+        next_billing_date:
+          periods.current_period_end ?? localSubscription.next_billing_date,
+        ...(preserveGraceStart
+          ? { updated_at: localSubscription.updated_at }
+          : {}),
+      },
+      include: this.subscriptionInclude(),
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        table_name: 'Subscription',
+        record_id: subscription.id,
+        action: AuditAction.WEBHOOK,
+        actor_id: hints.user_id || subscription.user_id || 'stripe_webhook',
+        actor_type: 'webhook',
+        old_values: {
+          status: previousStatus,
+        },
+        new_values: {
+          status: subscription.status,
+        },
+        metadata: {
+          event: 'invoice.payment_failed',
+          stripe_subscription_id: stripeSubscriptionId,
+          stripe_invoice_id: hints.stripe_invoice_id ?? null,
+          amount_due_cents: hints.amount_due_cents ?? null,
+          currency: hints.currency ?? null,
+          grace_period_days: this.gracePeriodDays,
+          entering_past_due:
+            !wasPastDue && subscription.status === SubscriptionStatus.PAST_DUE,
+        },
+      },
+    });
+
+    this.logger.warn(
+      `Subscription payment failed for ${subscription.id}: ${previousStatus} -> ${subscription.status}`,
+    );
+
+    return subscription;
+  }
+
+  async abandonPendingCheckoutSubscription(
+    subscriptionId: string,
+    reason: string,
+  ) {
+    const result = await this.prisma.subscription.updateMany({
+      where: {
+        id: subscriptionId,
+        status: SubscriptionStatus.INACTIVE,
+        stripe_subscription_id: null,
+      },
+      data: {
+        status: SubscriptionStatus.CANCELLED,
+        cancel_at: new Date(),
+        cancellation_reason: reason,
+      },
+    });
+
+    if (result.count > 0) {
+      this.logger.log(
+        `Abandoned pending checkout subscription ${subscriptionId}: ${reason}`,
+      );
+    }
+
+    return result.count;
+  }
+
   async markStripeSubscriptionDeleted(stripeSubscription: Stripe.Subscription) {
     const stripeSubscriptionId = stripeSubscription.id;
     const periods = this.extractStripePeriods(stripeSubscription);
@@ -562,6 +692,12 @@ export class SubscriptionRepository {
       current_period_start: start ? new Date(start * 1000) : null,
       current_period_end: end ? new Date(end * 1000) : null,
     };
+  }
+
+  private isGracePeriodExpired(graceStart: Date) {
+    const graceEnd =
+      graceStart.getTime() + this.gracePeriodDays * 86_400_000;
+    return Date.now() > graceEnd;
   }
 
   private mapStripeStatus(status: Stripe.Subscription.Status) {
