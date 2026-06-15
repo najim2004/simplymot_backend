@@ -21,7 +21,7 @@ import type Stripe from 'stripe';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { QuerySubscriptionDto } from './dto/query-subscription.dto';
 import { CancelSubscriptionDto } from './dto/update-subscription.dto';
-import { PromoCodeService } from 'src/modules/admin/promo-code/promo-code.service';
+import { PromoCodeRepository } from 'src/common/repository/promo-code/promo-code.repository';
 
 type SubscriptionWithPlan = Prisma.SubscriptionGetPayload<{
   include: {
@@ -44,7 +44,7 @@ export class SubscriptionService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly promoCodeService: PromoCodeService,
+    private readonly promoCodeRepository: PromoCodeRepository,
   ) {}
 
   async getActivePlans(user_id: string, query: QuerySubscriptionDto = {}) {
@@ -217,7 +217,7 @@ export class SubscriptionService {
     }
 
     const stripeCustomerId = await this.getOrCreateStripeCustomer(user);
-    const promoCode = await this.promoCodeService.validateForRedemption(
+    const promoCode = await this.promoCodeRepository.validateForRedemption(
       createSubscriptionDto.promo_code,
     );
 
@@ -529,7 +529,7 @@ export class SubscriptionService {
       });
     }
 
-    await this.promoCodeService.markRedeemedByStripePromotionCode(
+    await this.promoCodeRepository.markRedeemedByStripePromotionCode(
       hints.stripe_promotion_code_id,
     );
 
@@ -544,7 +544,9 @@ export class SubscriptionService {
         new_values: subscription as any,
         metadata: {
           stripe_subscription_id: stripeSubscriptionId,
-          event: localSubscription ? 'subscription_updated' : 'subscription_created',
+          event: localSubscription
+            ? 'subscription_updated'
+            : 'subscription_created',
         },
       },
     });

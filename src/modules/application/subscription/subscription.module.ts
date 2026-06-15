@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 import { SubscriptionController } from './subscription.controller';
-import { PromoCodeService } from 'src/modules/admin/promo-code/promo-code.service';
 
 @Module({
   controllers: [SubscriptionController],
-  providers: [SubscriptionService, PromoCodeService],
+  providers: [SubscriptionService],
   exports: [SubscriptionService],
 })
 export class SubscriptionModule {}
+

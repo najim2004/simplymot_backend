@@ -9,6 +9,7 @@ import { VehicleRepository } from './vehicle/vehicle.repository';
 import { SubscriptionRepository } from './subscription/subscription.repository';
 import { SlotRepository } from './slot/slot.repository';
 import { PostCodeMapRepository } from './post-code-map/post-code-map.repository';
+import { PromoCodeRepository } from './promo-code/promo-code.repository';
 
 @Global()
 @Module({
@@ -23,6 +24,7 @@ import { PostCodeMapRepository } from './post-code-map/post-code-map.repository'
     SubscriptionRepository,
     SlotRepository,
     PostCodeMapRepository,
+    PromoCodeRepository,
   ],
   exports: [
     UserRepository,
@@ -34,6 +36,7 @@ import { PostCodeMapRepository } from './post-code-map/post-code-map.repository'
     SubscriptionRepository,
     SlotRepository,
     PostCodeMapRepository,
+    PromoCodeRepository,
   ],
 })
 export class RepositoryModule {}

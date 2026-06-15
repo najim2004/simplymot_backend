@@ -69,7 +69,7 @@ export class SubscriptionRepository {
       ? subscription.current_period_end.getTime()
       : null;
     const hasPeriodAccess = periodEnd ? periodEnd > Date.now() : false;
-    const activeStatuses = [
+    const activeStatuses: SubscriptionStatus[] = [
       SubscriptionStatus.TRIALING,
       SubscriptionStatus.ACTIVE,
     ];
