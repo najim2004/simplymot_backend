@@ -109,8 +109,17 @@ export default () => ({
 
   dvla: {
     api_key: process.env.DVLA_API_KEY,
-    /** Optional HTTP(S) proxy for DVLA vehicle + MOT API outbound calls, e.g. http://user:pass@host:8080 */
+    /** Static fallback proxy when Webshare API is unavailable. */
     proxy_url: process.env.DVLA_PROXY_URL,
+    /** Webshare API token — fetches current proxy list (refreshes when IPs change). */
+    webshare_api_token: process.env.WEBSHARE_API_TOKEN,
+    proxy_prefer_countries: (process.env.DVLA_PROXY_PREFER_COUNTRIES ?? 'GB,US')
+      .split(',')
+      .map((c) => c.trim().toUpperCase())
+      .filter(Boolean),
+    /** Minutes before re-fetching proxy list from Webshare (default 10). */
+    proxy_refresh_minutes:
+      parseInt(process.env.DVLA_PROXY_REFRESH_MINUTES ?? '10', 10) || 10,
   },
   mot: {
     client_id: process.env.MOT_CLIENT_ID,

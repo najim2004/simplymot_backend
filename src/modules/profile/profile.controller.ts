@@ -10,16 +10,18 @@ import {
 import { ProfileService } from './profile.service';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
-
 @ApiTags('Profile')
 @Controller('profile')
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
-  @ApiSuccessResponse({
+  @ApiOperation({
     summary: 'Create profile',
+    description: 'Internal scaffold endpoint.',
+  })
+  @ApiSuccessResponse({
     message: 'Profile created successfully',
     data: { id: 'profile_id' },
   })
@@ -28,8 +30,11 @@ export class ProfileController {
     return this.profileService.create(createProfileDto);
   }
 
-  @ApiSuccessResponse({
+  @ApiOperation({
     summary: 'List profiles',
+    description: 'Internal scaffold endpoint.',
+  })
+  @ApiSuccessResponse({
     message: 'Profiles fetched successfully',
     data: [],
   })
@@ -38,33 +43,39 @@ export class ProfileController {
     return this.profileService.findAll();
   }
 
-  @ApiSuccessResponse({
+  @ApiOperation({
     summary: 'Get profile',
+    description: 'Internal scaffold endpoint.',
+  })
+  @ApiSuccessResponse({
     message: 'Profile fetched successfully',
     data: { id: 'profile_id' },
-    includeNotFound: true,
   })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.profileService.findOne(+id);
   }
 
-  @ApiSuccessResponse({
+  @ApiOperation({
     summary: 'Update profile',
+    description: 'Internal scaffold endpoint.',
+  })
+  @ApiSuccessResponse({
     message: 'Profile updated successfully',
     data: { id: 'profile_id' },
-    includeNotFound: true,
   })
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateProfileDto: UpdateProfileDto) {
     return this.profileService.update(+id, updateProfileDto);
   }
 
-  @ApiSuccessResponse({
+  @ApiOperation({
     summary: 'Delete profile',
+    description: 'Internal scaffold endpoint.',
+  })
+  @ApiSuccessResponse({
     message: 'Profile deleted successfully',
     data: { id: 'profile_id' },
-    includeNotFound: true,
   })
   @Delete(':id')
   remove(@Param('id') id: string) {

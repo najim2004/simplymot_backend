@@ -13,12 +13,9 @@ import {
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
-  ApiBadRequestResponse,
-  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -43,45 +40,41 @@ import {
   LoginResponseDto,
   MessageSuccessDto,
 } from './dto/swagger/auth-api.dto';
-
-@ApiTags('auth')
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @ApiOperation({
-    summary: 'Current user profile',
+    summary: 'Get current user profile',
     description:
-      'Returns the authenticated user with optional garage summary and avatar URL.',
+      'Requires JWT. Returns user profile, garage summary (GARAGE), roles (ADMIN), and active subscription summary (GARAGE).',
   })
   @ApiBearerAuth()
   @ApiOkResponse({ type: AuthMeResponseDto })
-  @ApiUnauthorizedResponse()
-  @ApiNotFoundResponse({ description: 'User no longer exists' })
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async me(@User('id') id: string) {
     return this.authService.me(id);
   }
 
-  @ApiOperation({ summary: 'Register a new account' })
-  @ApiCreatedResponse({
-    description: 'Registration accepted; OTP sent to email',
-    type: MessageSuccessDto,
+  @ApiOperation({
+    summary: 'Register account',
+    description:
+      'Public. Send `kind` = DRIVER or GARAGE. Garage registration requires garage fields. Sends email verification OTP.',
   })
+  @ApiCreatedResponse({ type: MessageSuccessDto })
   @Post('register')
   async register(@Body() registerUserDto: RegisterUserDto) {
     return this.authService.register(registerUserDto);
   }
 
   @ApiOperation({
-    summary: 'Login with email and password',
-    description: 'Returns a JWT access token and a normalized user payload.',
+    summary: 'Login',
+    description:
+      'Public. Email + password. Returns `authorization.access_token` — use as `Authorization: Bearer <token>`.',
   })
   @ApiOkResponse({ type: LoginResponseDto })
-  @ApiUnauthorizedResponse({
-    description: 'Invalid credentials or account state',
-  })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   login(@User('id') id: string, @User('email') email: string) {
@@ -89,9 +82,8 @@ export class AuthController {
   }
 
   @ApiOperation({
-    summary: 'Update profile (multipart)',
-    description:
-      'Send `name`, `phone_number` as form fields; optional `avatar` file.',
+    summary: 'Update profile',
+    description: 'Requires JWT. Multipart: `name`, `phone_number`, optional `avatar` file.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -99,21 +91,18 @@ export class AuthController {
       type: 'object',
       properties: {
         name: { type: 'string', example: 'Jane Doe' },
-        phone_number: { type: 'string', example: '+8801712345678' },
+        phone_number: { type: 'string', example: '+441234567890' },
         avatar: { type: 'string', format: 'binary' },
       },
     },
   })
   @ApiBearerAuth()
   @ApiOkResponse({ type: MessageSuccessDto })
-  @ApiUnauthorizedResponse()
   @UseGuards(JwtAuthGuard)
   @Patch('update')
   @UseInterceptors(
     FileInterceptor('avatar', {
-      limits: {
-        fileSize: 1024 * 1024 * 20,
-      },
+      limits: { fileSize: 1024 * 1024 * 20 },
       storage: memoryStorage(),
     }),
   )
@@ -125,29 +114,40 @@ export class AuthController {
     return this.authService.updateUser(id, data, avatar);
   }
 
-  @ApiOperation({ summary: 'Request password recovery OTP' })
+  @ApiOperation({
+    summary: 'Forgot password',
+    description: 'Public. Sends OTP to registered email.',
+  })
   @ApiOkResponse({ type: MessageSuccessDto })
-  @ApiNotFoundResponse({ description: 'Email not registered' })
   @Post('forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
   }
 
-  @ApiOperation({ summary: 'Validate OTP without consuming it' })
+  @ApiOperation({
+    summary: 'Validate OTP',
+    description: 'Public. Checks OTP validity without consuming it.',
+  })
   @ApiOkResponse({ type: MessageSuccessDto })
   @Post('check-otp')
   checkOTPValidation(@Body() checkOTPValidationDto: CheckOTPValidationDto) {
     return this.authService.checkOTPValidation(checkOTPValidationDto);
   }
 
-  @ApiOperation({ summary: 'Verify email with OTP/token' })
+  @ApiOperation({
+    summary: 'Verify email',
+    description: 'Public. Confirms email with OTP/token from registration email.',
+  })
   @ApiOkResponse({ type: MessageSuccessDto })
   @Post('verify-email')
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
     return this.authService.verifyEmail(verifyEmailDto);
   }
 
-  @ApiOperation({ summary: 'Resend email verification OTP' })
+  @ApiOperation({
+    summary: 'Resend verification email',
+    description: 'Public. Resends email verification OTP.',
+  })
   @ApiOkResponse({ type: MessageSuccessDto })
   @Post('resend-verification-email')
   async resendVerificationEmail(
@@ -156,18 +156,22 @@ export class AuthController {
     return this.authService.resendVerificationEmail(resendVerificationEmailDto);
   }
 
-  @ApiOperation({ summary: 'Reset password using OTP' })
+  @ApiOperation({
+    summary: 'Reset password',
+    description: 'Public. Reset password using OTP from forgot-password flow.',
+  })
   @ApiOkResponse({ type: MessageSuccessDto })
   @Post('reset-password')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
   }
 
-  @ApiOperation({ summary: 'Change password (authenticated)' })
+  @ApiOperation({
+    summary: 'Change password',
+    description: 'Requires JWT. Current password + new password.',
+  })
   @ApiBearerAuth()
   @ApiOkResponse({ type: MessageSuccessDto })
-  @ApiUnauthorizedResponse()
-  @ApiBadRequestResponse({ description: 'Current password incorrect' })
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
   async changePassword(
@@ -180,10 +184,12 @@ export class AuthController {
     });
   }
 
-  @ApiOperation({ summary: 'Request email change OTP' })
+  @ApiOperation({
+    summary: 'Request email change',
+    description: 'Requires JWT. Sends OTP to the new email address.',
+  })
   @ApiBearerAuth()
   @ApiOkResponse({ type: MessageSuccessDto })
-  @ApiUnauthorizedResponse()
   @UseGuards(JwtAuthGuard)
   @Post('request-email-change')
   async requestEmailChange(
@@ -193,10 +199,12 @@ export class AuthController {
     return this.authService.requestEmailChange(id, requestEmailChangeDto);
   }
 
-  @ApiOperation({ summary: 'Confirm email change with OTP' })
+  @ApiOperation({
+    summary: 'Confirm email change',
+    description: 'Requires JWT. Confirm with OTP sent to new email.',
+  })
   @ApiBearerAuth()
   @ApiOkResponse({ type: MessageSuccessDto })
-  @ApiUnauthorizedResponse()
   @UseGuards(JwtAuthGuard)
   @Post('change-email')
   async changeEmail(@Body() changeEmailDto: ChangeEmailDto) {

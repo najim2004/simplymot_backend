@@ -15,7 +15,31 @@ import { Roles } from 'src/common/guard/role/roles.decorator';
 import { Role } from 'src/common/guard/role/role.enum';
 import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
 
-@ApiTags('Transaction')
+const TRANSACTION_EXAMPLE = {
+  id: 'cltxn001',
+  user_id: 'cluser001',
+  entity_id: 'clbooking001',
+  kind: 'PAYMENT',
+  provider: 'STRIPE',
+  reference_number: 'pi_xxx',
+  status: 'COMPLETED',
+  amount: 45.0,
+  currency: 'GBP',
+  paid_amount: 45.0,
+  paid_currency: 'GBP',
+  raw_status: 'succeeded',
+  booking_id: 'clbooking001',
+  created_at: '2026-06-20T10:05:00.000Z',
+  updated_at: '2026-06-20T10:05:00.000Z',
+  user: {
+    id: 'cluser001',
+    email: 'john@example.com',
+    name: 'John Driver',
+    kind: 'DRIVER',
+  },
+};
+
+@ApiTags('Admin Transactions')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -23,26 +47,27 @@ import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decor
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
 
-  @ApiOperation({ summary: 'List transactions (paginated)' })
-  @ApiSuccessResponse({
+  @ApiOperation({
     summary: 'List transactions',
+    description: 'ADMIN + JWT. Paginated payment transactions.',
+  })
+  @ApiSuccessResponse({
     message: 'Transactions fetched successfully',
-    data: [],
-    metaData: { total: 1, page: 1, limit: 10 },
-    includeAuthErrors: true,
+    data: [TRANSACTION_EXAMPLE],
+    metaData: { total: 50, page: 1, limit: 10, pages: 5 },
   })
   @Get()
   findAll(@Query() query: QueryTransactionDto) {
     return this.transactionService.findAll(query);
   }
 
-  @ApiOperation({ summary: 'Get one transaction by id' })
+  @ApiOperation({
+    summary: 'Get transaction',
+    description: 'ADMIN + JWT.',
+  })
   @ApiSuccessResponse({
-    summary: 'Get one transaction by id',
     message: 'Transaction fetched successfully',
-    data: { id: 'transaction_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: TRANSACTION_EXAMPLE,
   })
   @Get(':transaction_id')
   findOne(
@@ -52,13 +77,13 @@ export class TransactionController {
     return this.transactionService.findOne(transaction_id, query);
   }
 
-  @ApiOperation({ summary: 'Soft-delete a transaction' })
+  @ApiOperation({
+    summary: 'Delete transaction',
+    description: 'ADMIN + JWT. Soft delete.',
+  })
   @ApiSuccessResponse({
-    summary: 'Soft-delete a transaction',
     message: 'Transaction deleted successfully',
-    data: { id: 'transaction_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: { id: 'cltxn001' },
   })
   @Delete(':transaction_id')
   remove(

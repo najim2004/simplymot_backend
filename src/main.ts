@@ -69,14 +69,51 @@ async function bootstrap() {
 
   // swagger
   const options = new DocumentBuilder()
-    .setTitle(`${process.env.APP_NAME} api`)
-    .setDescription(`${process.env.APP_NAME} api docs`)
+    .setTitle(`${process.env.APP_NAME || 'MOT'} API`)
+    .setDescription(
+      [
+        'REST API for garage booking, subscriptions, vehicles and admin management.',
+        '',
+        '**Auth:** Most endpoints require `Authorization: Bearer <token>`.',
+        '**Response envelope:** `{ success, message, data, meta_data? }`',
+        '',
+        'Public endpoints: `POST /auth/register`, `POST /auth/login`, `GET /garages/discover`, `GET /garages/:id/slots`, `POST /contact`, `GET /subscription/success`.',
+      ].join('\n'),
+    )
     .setVersion('1.0')
-    .addTag(`${process.env.APP_NAME}`)
-    .addBearerAuth()
+    .addBearerAuth({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      description: 'JWT from POST /auth/login',
+    })
+    .addTag('Auth', 'Registration, login, profile and password flows')
+    .addTag('Garage', 'Garage owner operations and public garage discovery')
+    .addTag('Booking', 'Driver and garage booking management')
+    .addTag('Vehicle', 'Driver vehicle fleet and MOT history')
+    .addTag('Subscription', 'Garage subscription plans and Stripe checkout')
+    .addTag('Invoice', 'User invoices')
+    .addTag('Notification', 'In-app notifications')
+    .addTag('Contact', 'Public contact form')
+    .addTag('Admin Users', 'Admin user management')
+    .addTag('Admin Garages', 'Admin garage management')
+    .addTag('Admin Bookings', 'Admin booking oversight')
+    .addTag('Admin Subscriptions', 'Subscription plan management')
+    .addTag('Admin Transactions', 'Payment transaction management')
+    .addTag('Admin Promo Codes', 'Promo code management')
+    .addTag('Admin Vehicles', 'Vehicle administration')
+    .addTag('Admin Contacts', 'Contact form submissions')
+    .addTag('Admin Roles', 'Role and permission management')
+    .addTag('Stripe', 'Stripe webhooks')
     .build();
   const document = SwaggerModule.createDocument(app, options);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    },
+  });
   // end swagger
 
   await app.listen(process.env.PORT ?? 4000, '0.0.0.0');

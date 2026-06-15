@@ -41,6 +41,7 @@ export class SeedCommand extends CommandRunner {
   async userSeed() {
     // system admin, user id: 1
     const systemUser = await this.userRepository.createSuAdminUser({
+      name: appConfig().defaultUser.system.username,
       username: appConfig().defaultUser.system.username,
       email: appConfig().defaultUser.system.email,
       password: appConfig().defaultUser.system.password,

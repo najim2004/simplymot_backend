@@ -10,103 +10,162 @@ import {
 /**
  * DVLA Service for interacting with UK Driver and Vehicle Licensing Agency APIs
  *
- * This service handles:
- * - Vehicle enquiry API (basic vehicle information)
- * - MOT History API (detailed MOT test history and vehicle details)
- * - Automatic OAuth token management for MOT API
- * - Optional outbound HTTP(S) proxy (DVLA_PROXY_URL) for vehicle + MOT calls
- * - Comprehensive error handling and logging
+ * Outbound proxy: Webshare API (GB → US) with DVLA_PROXY_URL fallback.
  */
 export class DvlaService {
   private static readonly logger = new Logger(DvlaService.name);
 
-  // API Configuration
   private static readonly DVLA_API_KEY = appConfig().dvla.api_key;
   private static readonly DVLA_VEHICLE_URL =
     'https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles';
   private static readonly MOT_API_BASE_URL =
     'https://history.mot.api.gov.uk/v1/trade/vehicles/registration';
-
-  // MOT API OAuth Configuration
   private static readonly MOT_CLIENT_ID = appConfig().mot.client_id;
   private static readonly MOT_CLIENT_SECRET = appConfig().mot.client_secret;
   private static readonly MOT_TOKEN_URL =
     'https://login.microsoftonline.com/a455b827-244f-4c97-b5b4-ce5d13b4d00c/oauth2/v2.0/token';
   private static readonly MOT_SCOPE = 'https://tapi.dvsa.gov.uk/.default';
+  private static readonly WEBSHARE_PROXY_LIST_URL =
+    'https://proxy.webshare.io/api/v2/proxy/list/';
 
-  // Token management
   private static motAccessToken: string | null = null;
   private static tokenExpiryTime: number = 0;
+  private static outboundProxyCache: {
+    config: AxiosProxyConfig;
+    country: string;
+    fetchedAt: number;
+  } | null = null;
 
-  /** `null` = not resolved yet; `false` = no proxy; object = axios proxy config */
-  private static outboundProxyCache: AxiosProxyConfig | false | null = null;
+  static async resolveOutboundProxy(): Promise<AxiosProxyConfig | undefined> {
+    const { dvla } = appConfig();
+    const apiToken = dvla.webshare_api_token?.trim();
+    const fallbackUrl = dvla.proxy_url?.trim();
+    const refreshMinutes = dvla.proxy_refresh_minutes ?? 10;
+    const preferCountries = dvla.proxy_prefer_countries ?? ['GB', 'US'];
+    const ttlMs = refreshMinutes * 60 * 1000;
+    const now = Date.now();
 
-  private static getOutboundProxyConfig(): AxiosProxyConfig | undefined {
-    if (this.outboundProxyCache === false) {
+    if (!apiToken && !fallbackUrl) {
       return undefined;
     }
-    if (this.outboundProxyCache !== null) {
-      return this.outboundProxyCache;
+
+    if (
+      this.outboundProxyCache &&
+      now - this.outboundProxyCache.fetchedAt < ttlMs
+    ) {
+      return this.outboundProxyCache.config;
     }
-    const url = appConfig().dvla.proxy_url?.trim();
-    if (!url) {
-      this.outboundProxyCache = false;
-      return undefined;
+
+    if (apiToken) {
+      try {
+        for (const countryCode of preferCountries) {
+          const listResponse = await axios.get<{
+            results: Array<{
+              id: string;
+              username: string;
+              password: string;
+              proxy_address: string;
+              port: number;
+              valid: boolean;
+              country_code: string;
+            }>;
+          }>(this.WEBSHARE_PROXY_LIST_URL, {
+            params: {
+              mode: 'direct',
+              valid: true,
+              country_code__in: countryCode,
+              page: 1,
+              page_size: 25,
+            },
+            headers: { Authorization: `Token ${apiToken}` },
+            timeout: 15000,
+          });
+
+          const entry = listResponse.data.results?.find(
+            (proxyEntry) =>
+              proxyEntry.valid &&
+              proxyEntry.proxy_address &&
+              proxyEntry.port &&
+              proxyEntry.username &&
+              proxyEntry.password,
+          );
+
+          if (entry) {
+            const config: AxiosProxyConfig = {
+              protocol: 'http',
+              host: entry.proxy_address,
+              port: entry.port,
+              auth: {
+                username: entry.username,
+                password: entry.password,
+              },
+            };
+            this.outboundProxyCache = {
+              config,
+              country: entry.country_code,
+              fetchedAt: now,
+            };
+            this.logger.log(
+              `DVLA outbound proxy via Webshare (${entry.country_code}) ${config.host}:${config.port}`,
+            );
+            return config;
+          }
+        }
+
+        this.logger.warn(
+          'Webshare API returned no valid proxy for preferred countries; trying DVLA_PROXY_URL fallback',
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Webshare proxy list fetch failed: ${error instanceof Error ? error.message : error}`,
+        );
+      }
     }
-    const parsed = this.parseProxyUrl(url);
-    if (!parsed) {
-      this.logger.warn(
-        'DVLA_PROXY_URL is set but could not be parsed; outbound calls run without proxy',
-      );
-      this.outboundProxyCache = false;
-      return undefined;
+
+    if (fallbackUrl) {
+      try {
+        const normalized = fallbackUrl.trim().replace(/\/+$/, '');
+        const parsedUrl = new URL(normalized);
+        const protocol = (parsedUrl.protocol.replace(':', '') || 'http') as
+          | 'http'
+          | 'https';
+        const port = parsedUrl.port
+          ? parseInt(parsedUrl.port, 10)
+          : protocol === 'https'
+            ? 443
+            : 80;
+        const auth =
+          parsedUrl.username !== ''
+            ? {
+                username: decodeURIComponent(parsedUrl.username),
+                password: decodeURIComponent(parsedUrl.password),
+              }
+            : undefined;
+        const config: AxiosProxyConfig = {
+          protocol,
+          host: parsedUrl.hostname,
+          port,
+          auth,
+        };
+        this.outboundProxyCache = {
+          config,
+          country: 'static',
+          fetchedAt: now,
+        };
+        this.logger.log(
+          `DVLA outbound proxy via DVLA_PROXY_URL ${config.host}:${config.port}`,
+        );
+        return config;
+      } catch {
+        this.logger.warn(
+          'DVLA_PROXY_URL is set but could not be parsed; outbound calls run without proxy',
+        );
+      }
     }
-    this.outboundProxyCache = parsed;
-    this.logger.log(
-      'DVLA_PROXY_URL is set; DVLA vehicle and MOT API requests use this proxy',
-    );
-    return parsed;
+
+    return undefined;
   }
 
-  private static parseProxyUrl(raw: string): AxiosProxyConfig | null {
-    try {
-      // e.g. http://user:pass@31.59.20.176:6754/ — trim + drop trailing slashes
-      const normalized = raw.trim().replace(/\/+$/, '');
-      const u = new URL(normalized);
-      const protocol = (u.protocol.replace(':', '') || 'http') as
-        | 'http'
-        | 'https';
-      const port = u.port
-        ? parseInt(u.port, 10)
-        : protocol === 'https'
-          ? 443
-          : 80;
-      const auth =
-        u.username !== ''
-          ? {
-              username: decodeURIComponent(u.username),
-              password: decodeURIComponent(u.password),
-            }
-          : undefined;
-      return {
-        protocol,
-        host: u.hostname,
-        port,
-        auth,
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Get vehicle details from DVLA Vehicle Enquiry API
-   *
-   * @param registrationNumber - UK vehicle registration number (e.g., 'OV12UYY')
-   * @returns Promise<DvlaVehicleResponse> - Vehicle information from DVLA
-   * @throws NotFoundException - When vehicle is not found
-   * @throws InternalServerErrorException - When DVLA API is unavailable
-   */
   static async getVehicleDetails(
     registrationNumber: string,
   ): Promise<DvlaVehicleResponse> {
@@ -114,28 +173,80 @@ export class DvlaService {
       const normalizedRegistration =
         this.normalizeRegistrationNumber(registrationNumber);
 
-      // this.logger.log(
-      //   `Fetching vehicle details for registration: ${registrationNumber}`,
-      // );
-
-      // Validate registration number format
       if (!this.isValidRegistrationNumber(normalizedRegistration)) {
         throw new BadRequestException('Invalid registration number format');
       }
 
-      const proxy = this.getOutboundProxyConfig();
-      const response: AxiosResponse<DvlaVehicleResponse> = await axios.post(
-        this.DVLA_VEHICLE_URL,
-        { registrationNumber: normalizedRegistration },
-        {
-          headers: {
-            'x-api-key': this.DVLA_API_KEY,
-            'Content-Type': 'application/json',
+      let proxy = await this.resolveOutboundProxy();
+      let response: AxiosResponse<DvlaVehicleResponse>;
+
+      try {
+        response = await axios.post(
+          this.DVLA_VEHICLE_URL,
+          { registrationNumber: normalizedRegistration },
+          {
+            headers: {
+              'x-api-key': this.DVLA_API_KEY,
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000,
+            ...(proxy ? { proxy } : {}),
           },
-          timeout: 10000, // 10 second timeout
-          ...(proxy ? { proxy } : {}),
-        },
-      );
+        );
+      } catch (error) {
+        let proxyError = false;
+        if (axios.isAxiosError(error)) {
+          if (error.response?.status === 407) {
+            proxyError = true;
+          } else if (
+            !error.response &&
+            error.code &&
+            [
+              'ECONNREFUSED',
+              'ETIMEDOUT',
+              'ECONNRESET',
+              'EPROXY',
+              'ECONNABORTED',
+              'ENOTFOUND',
+            ].includes(error.code)
+          ) {
+            proxyError = true;
+          }
+        } else {
+          const code = (error as NodeJS.ErrnoException)?.code;
+          if (
+            code === 'ECONNREFUSED' ||
+            code === 'ETIMEDOUT' ||
+            code === 'ECONNRESET' ||
+            code === 'EPROXY' ||
+            code === 'ECONNABORTED'
+          ) {
+            proxyError = true;
+          }
+        }
+
+        if (!proxyError) {
+          this.handleDvlaApiError(error, registrationNumber, 'vehicle details');
+        }
+
+        this.logger.warn(
+          'Outbound proxy error; refreshing proxy list and retrying once',
+        );
+        this.outboundProxyCache = null;
+        proxy = await this.resolveOutboundProxy();
+        response = await axios.post(
+          this.DVLA_VEHICLE_URL,
+          { registrationNumber: normalizedRegistration },
+          {
+            headers: {
+              'x-api-key': this.DVLA_API_KEY,
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000,
+            ...(proxy ? { proxy } : {}),
+          },
+        );
+      }
 
       this.logger.log(
         `Successfully retrieved vehicle details for: ${normalizedRegistration}`,
@@ -146,14 +257,6 @@ export class DvlaService {
     }
   }
 
-  /**
-   * Get MOT history and detailed vehicle information from MOT History API
-   *
-   * @param registrationNumber - UK vehicle registration number
-   * @returns Promise<MotHistoryResponse> - MOT history and vehicle details
-   * @throws NotFoundException - When vehicle is not found
-   * @throws InternalServerErrorException - When MOT API is unavailable
-   */
   static async getMotHistory(
     registrationNumber: string,
   ): Promise<MotHistoryResponse> {
@@ -165,12 +268,10 @@ export class DvlaService {
         `Fetching MOT history for registration: ${normalizedRegistration}`,
       );
 
-      // Validate registration number format
       if (!this.isValidRegistrationNumber(normalizedRegistration)) {
         throw new BadRequestException('Invalid registration number format');
       }
 
-      // Ensure we have a valid access token
       await this.ensureValidMotToken();
 
       const config = appConfig();
@@ -178,33 +279,100 @@ export class DvlaService {
         process.env.MOT_API_USER_AGENT?.trim() ||
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
 
-      const proxy = this.getOutboundProxyConfig();
-      const response: AxiosResponse<MotHistoryResponse> = await axios.get(
-        `${this.MOT_API_BASE_URL}/${normalizedRegistration}`,
-        {
-          headers: {
-            // MOTH API V3 QuickStart: Authorization + X-API-Key (required).
-            Authorization: `Bearer ${this.motAccessToken}`,
-            'X-API-Key': config.mot.api_key,
-            'User-Agent': motUserAgent,
-            Accept: 'application/json, text/plain, */*',
-            'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'cross-site',
-            'Sec-Ch-Ua': '"Chromium";v="129", "Not=A?Brand";v="24"',
-            'Sec-Ch-Ua-Mobile': '?0',
-            'Sec-Ch-Ua-Platform': '"Windows"',
-            DNT: '1',
-            Connection: 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
+      let proxy = await this.resolveOutboundProxy();
+      let response: AxiosResponse<MotHistoryResponse>;
+
+      try {
+        response = await axios.get(
+          `${this.MOT_API_BASE_URL}/${normalizedRegistration}`,
+          {
+            headers: {
+              Authorization: `Bearer ${this.motAccessToken}`,
+              'X-API-Key': config.mot.api_key,
+              'User-Agent': motUserAgent,
+              Accept: 'application/json, text/plain, */*',
+              'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'cross-site',
+              'Sec-Ch-Ua': '"Chromium";v="129", "Not=A?Brand";v="24"',
+              'Sec-Ch-Ua-Mobile': '?0',
+              'Sec-Ch-Ua-Platform': '"Windows"',
+              DNT: '1',
+              Connection: 'keep-alive',
+              'Upgrade-Insecure-Requests': '1',
+            },
+            timeout: 15000,
+            ...(proxy ? { proxy } : {}),
           },
-          timeout: 15000,
-          ...(proxy ? { proxy } : {}),
-        },
-      );
-      // console.log(response.data);
+        );
+      } catch (error) {
+        let proxyError = false;
+        if (axios.isAxiosError(error)) {
+          if (error.response?.status === 407) {
+            proxyError = true;
+          } else if (
+            !error.response &&
+            error.code &&
+            [
+              'ECONNREFUSED',
+              'ETIMEDOUT',
+              'ECONNRESET',
+              'EPROXY',
+              'ECONNABORTED',
+              'ENOTFOUND',
+            ].includes(error.code)
+          ) {
+            proxyError = true;
+          }
+        } else {
+          const code = (error as NodeJS.ErrnoException)?.code;
+          if (
+            code === 'ECONNREFUSED' ||
+            code === 'ETIMEDOUT' ||
+            code === 'ECONNRESET' ||
+            code === 'EPROXY' ||
+            code === 'ECONNABORTED'
+          ) {
+            proxyError = true;
+          }
+        }
+
+        if (!proxyError) {
+          this.handleMotApiError(error, registrationNumber, 'MOT history');
+        }
+
+        this.logger.warn(
+          'Outbound proxy error; refreshing proxy list and retrying once',
+        );
+        this.outboundProxyCache = null;
+        proxy = await this.resolveOutboundProxy();
+        response = await axios.get(
+          `${this.MOT_API_BASE_URL}/${normalizedRegistration}`,
+          {
+            headers: {
+              Authorization: `Bearer ${this.motAccessToken}`,
+              'X-API-Key': config.mot.api_key,
+              'User-Agent': motUserAgent,
+              Accept: 'application/json, text/plain, */*',
+              'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'cross-site',
+              'Sec-Ch-Ua': '"Chromium";v="129", "Not=A?Brand";v="24"',
+              'Sec-Ch-Ua-Mobile': '?0',
+              'Sec-Ch-Ua-Platform': '"Windows"',
+              DNT: '1',
+              Connection: 'keep-alive',
+              'Upgrade-Insecure-Requests': '1',
+            },
+            timeout: 15000,
+            ...(proxy ? { proxy } : {}),
+          },
+        );
+      }
 
       this.logger.log(
         `Successfully retrieved MOT history for: ${normalizedRegistration}`,
@@ -215,12 +383,6 @@ export class DvlaService {
     }
   }
 
-  /**
-   * Get comprehensive vehicle information from both DVLA and MOT APIs
-   *
-   * @param registrationNumber - UK vehicle registration number
-   * @returns Promise<CombinedVehicleData> - Complete vehicle information
-   */
   static async getCompleteVehicleData(
     registrationNumber: string,
   ): Promise<CombinedVehicleData> {
@@ -232,13 +394,11 @@ export class DvlaService {
         `Fetching complete vehicle data for: ${normalizedRegistration}`,
       );
 
-      // Fetch data from both APIs concurrently for better performance
       const [dvlaData, motData] = await Promise.allSettled([
         this.getVehicleDetails(normalizedRegistration),
         this.getMotHistory(normalizedRegistration),
       ]);
 
-      // Combine data from both sources
       const combinedData: CombinedVehicleData = {
         registrationNumber: normalizedRegistration,
         dvlaData: dvlaData.status === 'fulfilled' ? dvlaData.value : null,
@@ -246,7 +406,6 @@ export class DvlaService {
         lastUpdated: new Date(),
       };
 
-      // Log success/failure for each API
       if (dvlaData.status === 'fulfilled') {
         this.logger.log(`DVLA API: Success for ${normalizedRegistration}`);
       } else {
@@ -263,7 +422,6 @@ export class DvlaService {
         );
       }
 
-      // Ensure we have at least some data
       if (!combinedData.dvlaData && !combinedData.motData) {
         throw new NotFoundException('Vehicle not found in any database');
       }
@@ -281,14 +439,9 @@ export class DvlaService {
     }
   }
 
-  /**
-   * Ensure we have a valid MOT API access token
-   * Automatically refreshes token if expired or missing
-   */
   private static async ensureValidMotToken(): Promise<void> {
     const now = Date.now();
 
-    // Check if token is still valid (with 5 minute buffer)
     if (this.motAccessToken && now < this.tokenExpiryTime - 300000) {
       return;
     }
@@ -296,23 +449,84 @@ export class DvlaService {
     try {
       this.logger.log('Refreshing MOT API access token');
 
-      const proxy = this.getOutboundProxyConfig();
-      const response: AxiosResponse<MotTokenResponse> = await axios.post(
-        this.MOT_TOKEN_URL,
-        new URLSearchParams({
-          client_id: this.MOT_CLIENT_ID,
-          client_secret: this.MOT_CLIENT_SECRET,
-          scope: this.MOT_SCOPE,
-          grant_type: 'client_credentials',
-        }),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+      let proxy = await this.resolveOutboundProxy();
+      let response: AxiosResponse<MotTokenResponse>;
+
+      try {
+        response = await axios.post(
+          this.MOT_TOKEN_URL,
+          new URLSearchParams({
+            client_id: this.MOT_CLIENT_ID,
+            client_secret: this.MOT_CLIENT_SECRET,
+            scope: this.MOT_SCOPE,
+            grant_type: 'client_credentials',
+          }),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            timeout: 10000,
+            ...(proxy ? { proxy } : {}),
           },
-          timeout: 10000,
-          ...(proxy ? { proxy } : {}),
-        },
-      );
+        );
+      } catch (error) {
+        let proxyError = false;
+        if (axios.isAxiosError(error)) {
+          if (error.response?.status === 407) {
+            proxyError = true;
+          } else if (
+            !error.response &&
+            error.code &&
+            [
+              'ECONNREFUSED',
+              'ETIMEDOUT',
+              'ECONNRESET',
+              'EPROXY',
+              'ECONNABORTED',
+              'ENOTFOUND',
+            ].includes(error.code)
+          ) {
+            proxyError = true;
+          }
+        } else {
+          const code = (error as NodeJS.ErrnoException)?.code;
+          if (
+            code === 'ECONNREFUSED' ||
+            code === 'ETIMEDOUT' ||
+            code === 'ECONNRESET' ||
+            code === 'EPROXY' ||
+            code === 'ECONNABORTED'
+          ) {
+            proxyError = true;
+          }
+        }
+
+        if (!proxyError) {
+          throw error;
+        }
+
+        this.logger.warn(
+          'Outbound proxy error; refreshing proxy list and retrying once',
+        );
+        this.outboundProxyCache = null;
+        proxy = await this.resolveOutboundProxy();
+        response = await axios.post(
+          this.MOT_TOKEN_URL,
+          new URLSearchParams({
+            client_id: this.MOT_CLIENT_ID,
+            client_secret: this.MOT_CLIENT_SECRET,
+            scope: this.MOT_SCOPE,
+            grant_type: 'client_credentials',
+          }),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            timeout: 10000,
+            ...(proxy ? { proxy } : {}),
+          },
+        );
+      }
 
       this.motAccessToken = response.data.access_token;
       this.tokenExpiryTime = now + response.data.expires_in * 1000;
@@ -335,12 +549,6 @@ export class DvlaService {
     }
   }
 
-  /**
-   * Validate UK vehicle registration number format
-   *
-   * @param registrationNumber - Registration number to validate
-   * @returns boolean - True if format is valid
-   */
   private static normalizeRegistrationNumber(
     registrationNumber: string,
   ): string {
@@ -348,7 +556,6 @@ export class DvlaService {
       return '';
     }
 
-    // DVLA expects no spaces. Keep only letters and numbers for consistent lookups.
     return registrationNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
   }
 
@@ -359,8 +566,6 @@ export class DvlaService {
       return false;
     }
 
-    // Support private/cherished plates by allowing alphanumeric registrations,
-    // not only standard modern UK patterns.
     const cleanReg = this.normalizeRegistrationNumber(registrationNumber);
     const genericUkRegPattern = /^[A-Z0-9]+$/;
 
@@ -371,9 +576,6 @@ export class DvlaService {
     );
   }
 
-  /**
-   * Handle errors from DVLA Vehicle Enquiry API
-   */
   private static handleDvlaApiError(
     error: any,
     registrationNumber: string,
@@ -431,9 +633,6 @@ export class DvlaService {
     );
   }
 
-  /**
-   * Handle errors from MOT History API
-   */
   private static handleMotApiError(
     error: any,
     registrationNumber: string,
@@ -491,9 +690,6 @@ export class DvlaService {
     );
   }
 }
-
-// TypeScript interfaces for API responses
-// MOT shapes can evolve with API version; validate against live responses if parsing fails.
 
 export interface DvlaVehicleResponse {
   registrationNumber: string;

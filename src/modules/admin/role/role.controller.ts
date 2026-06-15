@@ -13,17 +13,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
-  ApiForbiddenResponse,
-  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guard/role/roles.guard';
@@ -52,10 +48,6 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard, AbilitiesGuard)
 @Roles(Role.ADMIN)
 @ApiBearerAuth()
-@ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' })
-@ApiForbiddenResponse({
-  description: 'Not an admin or missing required CASL ability on Role',
-})
 export class RoleController {
   constructor(private readonly roleService: RoleService) {}
 
@@ -125,7 +117,6 @@ export class RoleController {
     example: 'clxxxxxxxxxxxxxxxxxxxxxxxx',
   })
   @ApiOkResponse({ type: RoleDetailResponseDto })
-  @ApiNotFoundResponse({ description: 'Role not found or soft-deleted' })
   @CheckAbilities({ action: Action.Show, subject: 'Role' })
   async getRole(
     @Param('role_id') role_id: string,
@@ -137,9 +128,6 @@ export class RoleController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a custom role' })
   @ApiCreatedResponse({ type: CreateRoleResponseDto })
-  @ApiBadRequestResponse({
-    description: 'Validation error, reserved name, or duplicate slug',
-  })
   @CheckAbilities({ action: Action.Create, subject: 'Role' })
   async createRole(@Body() dto: CreateRoleDto): Promise<CreateRoleResponseDto> {
     return this.roleService.createRole(dto);
@@ -149,10 +137,6 @@ export class RoleController {
   @ApiOperation({ summary: 'Update role title or slug' })
   @ApiParam({ name: 'role_id', description: 'Role id (cuid)' })
   @ApiOkResponse({ type: UpdateRoleResponseDto })
-  @ApiNotFoundResponse({ description: 'Role not found' })
-  @ApiBadRequestResponse({
-    description: 'Validation or business rule violation',
-  })
   @CheckAbilities({ action: Action.Update, subject: 'Role' })
   async updateRole(
     @Param('role_id') role_id: string,
@@ -169,10 +153,6 @@ export class RoleController {
   })
   @ApiParam({ name: 'role_id', description: 'Role id (cuid)' })
   @ApiOkResponse({ type: DeleteRoleResponseDto })
-  @ApiNotFoundResponse({ description: 'Role not found' })
-  @ApiBadRequestResponse({
-    description: 'Protected role, still assigned, or constraint error',
-  })
   @CheckAbilities({ action: Action.Delete, subject: 'Role' })
   async deleteRole(
     @Param('role_id') role_id: string,
@@ -188,10 +168,6 @@ export class RoleController {
   })
   @ApiParam({ name: 'role_id', description: 'Role id (cuid)' })
   @ApiOkResponse({ type: SetRolePermissionsResponseDto })
-  @ApiNotFoundResponse({ description: 'Role not found' })
-  @ApiBadRequestResponse({
-    description: 'Invalid permission ids, mode, or policy violation',
-  })
   @CheckAbilities({ action: Action.Update, subject: 'Role' })
   async setRolePermissions(
     @Param('role_id') role_id: string,

@@ -80,7 +80,7 @@ export class SubscriptionRepository {
     ];
 
     return (
-      activeStatuses.includes(subscription.status) ||
+      (activeStatuses as SubscriptionStatus[]).includes(subscription.status) ||
       (subscription.status === SubscriptionStatus.CANCELLED &&
         hasPeriodAccess) ||
       subscription.status === SubscriptionStatus.PAST_DUE

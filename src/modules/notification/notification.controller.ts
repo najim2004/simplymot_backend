@@ -9,8 +9,38 @@ import {
 import { User } from 'src/modules/auth/decorators/get-user.decorator';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { NotificationService } from './notification.service';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
+
+const NOTIFICATION_ITEM = {
+  id: 'clnotif001',
+  sender_id: null,
+  receiver_id: 'cluser001',
+  entity_id: 'clbooking001',
+  status: 'UNREAD',
+  read_at: null,
+  created_at: '2026-06-14T10:00:00.000Z',
+  type: 'BOOKING_CONFIRMED',
+  title: 'Booking confirmed',
+  description: 'Your MOT booking is confirmed for 20 Jun 2026',
+  sender: null,
+  receiver: {
+    id: 'cluser001',
+    name: 'John Driver',
+    email: 'john@example.com',
+    avatar: null,
+  },
+  notification_event: {
+    id: 'clevent001',
+    type: 'BOOKING_CONFIRMED',
+    title: 'Booking confirmed',
+    description: 'Booking confirmed notification',
+  },
+};
+
+const UNREAD_COUNT = { unread_count: 3, receiver_kind: 'DRIVER' };
+const MARKED_COUNT = { marked_count: 3 };
+const DELETED_COUNT = { deleted_count: 5 };
 
 @ApiTags('Notification')
 @ApiBearerAuth()
@@ -19,115 +49,131 @@ import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decor
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
+  @ApiOperation({
+    summary: 'List notifications',
+    description: 'JWT. User notifications list.',
+  })
   @ApiSuccessResponse({
-    summary: 'List my notifications',
     message: 'Notifications fetched successfully',
-    data: [],
-    metaData: { receiver_kind: 'USER' },
-    includeAuthErrors: true,
+    data: [NOTIFICATION_ITEM],
+    metaData: { receiver_kind: 'DRIVER' },
   })
   @Get()
   findAll(@User('id') user_id: string) {
     return this.notificationService.findAll(user_id);
   }
 
+  @ApiOperation({
+    summary: 'Unread count',
+    description: 'JWT. Returns `unread_count`.',
+  })
   @ApiSuccessResponse({
-    summary: 'Get unread notification count',
     message: 'Unread notification count fetched successfully',
-    data: { unread_count: 3, receiver_kind: 'USER' },
-    includeAuthErrors: true,
+    data: UNREAD_COUNT,
   })
   @Get('count')
   count(@User('id') user_id: string) {
     return this.notificationService.countUnread(user_id);
   }
 
+  @ApiOperation({
+    summary: 'Unread count',
+    description: 'JWT. Returns `unread_count`.',
+  })
   @ApiSuccessResponse({
-    summary: 'Get unread notification count',
     message: 'Unread notification count fetched successfully',
-    data: { unread_count: 3, receiver_kind: 'USER' },
-    includeAuthErrors: true,
+    data: UNREAD_COUNT,
   })
   @Get('unread-count')
   unreadCount(@User('id') user_id: string) {
     return this.notificationService.countUnread(user_id);
   }
 
+  @ApiOperation({
+    summary: 'Get notification',
+    description: 'JWT. Single notification.',
+  })
   @ApiSuccessResponse({
-    summary: 'Get notification details',
     message: 'Notification fetched successfully',
-    data: { id: 'notification_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: NOTIFICATION_ITEM,
   })
   @Get(':id')
   findOne(@Param('id') id: string, @User('id') user_id: string) {
     return this.notificationService.findOne(id, user_id);
   }
 
+  @ApiOperation({
+    summary: 'Mark all as read',
+    description: 'JWT. Returns `marked_count`.',
+  })
   @ApiSuccessResponse({
-    summary: 'Mark all notifications as read',
     message: 'All notifications marked successfully',
-    data: { marked_count: 3 },
-    includeAuthErrors: true,
+    data: MARKED_COUNT,
   })
   @Patch('read-all')
   markAllRead(@User('id') user_id: string) {
     return this.notificationService.markAll(user_id);
   }
 
+  @ApiOperation({
+    summary: 'Mark all as read',
+    description: 'JWT. Returns `marked_count`.',
+  })
   @ApiSuccessResponse({
-    summary: 'Mark all notifications as read',
     message: 'All notifications marked successfully',
-    data: { marked_count: 3 },
-    includeAuthErrors: true,
+    data: MARKED_COUNT,
   })
   @Patch('all/mark')
   markAll(@User('id') user_id: string) {
     return this.notificationService.markAll(user_id);
   }
 
+  @ApiOperation({
+    summary: 'Mark as read',
+    description: 'JWT. Mark one notification read.',
+  })
   @ApiSuccessResponse({
-    summary: 'Mark notification as read',
     message: 'Notification marked successfully',
-    data: { id: 'notification_id', status: 'READ' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: { ...NOTIFICATION_ITEM, status: 'READ' },
   })
   @Patch(':id/read')
   markOneRead(@Param('id') id: string, @User('id') user_id: string) {
     return this.notificationService.markOne(id, user_id);
   }
 
+  @ApiOperation({
+    summary: 'Mark as read',
+    description: 'JWT. Mark one notification read.',
+  })
   @ApiSuccessResponse({
-    summary: 'Mark notification as read',
     message: 'Notification marked successfully',
-    data: { id: 'notification_id', status: 'READ' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: { ...NOTIFICATION_ITEM, status: 'READ' },
   })
   @Patch(':id/mark')
   markOne(@Param('id') id: string, @User('id') user_id: string) {
     return this.notificationService.markOne(id, user_id);
   }
 
-  @ApiSuccessResponse({
+  @ApiOperation({
     summary: 'Delete all notifications',
+    description: 'JWT. Returns `deleted_count`.',
+  })
+  @ApiSuccessResponse({
     message: 'All notifications deleted successfully',
-    data: { deleted_count: 3 },
-    includeAuthErrors: true,
+    data: DELETED_COUNT,
   })
   @Delete('all')
   removeAll(@User('id') user_id: string) {
     return this.notificationService.removeAll(user_id);
   }
 
-  @ApiSuccessResponse({
+  @ApiOperation({
     summary: 'Delete notification',
+    description: 'JWT. Delete one notification.',
+  })
+  @ApiSuccessResponse({
     message: 'Notification deleted successfully',
-    data: { id: 'notification_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: { id: 'clnotif001' },
   })
   @Delete(':id')
   remove(@Param('id') id: string, @User('id') user_id: string) {

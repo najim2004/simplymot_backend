@@ -13,7 +13,7 @@ import {
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '../../../common/guard/role/role.enum';
 import { Roles } from '../../../common/guard/role/roles.decorator';
 import { RolesGuard } from '../../../common/guard/role/roles.guard';
@@ -22,21 +22,51 @@ import { User } from '../../auth/decorators/get-user.decorator';
 import { QueryUserDto } from './dto/query-user.dto';
 import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
 
+const USER_LIST_ITEM = {
+  id: 'cluser001',
+  name: 'John Driver',
+  email: 'john@example.com',
+  avatar: null,
+  avatar_url: null,
+  phone_number: '+441112223333',
+  kind: 'DRIVER',
+  email_verified_at: '2026-01-15T00:00:00.000Z',
+  approved_at: '2026-01-16T00:00:00.000Z',
+  created_at: '2026-01-10T00:00:00.000Z',
+  status: 'ACTIVE',
+};
+
+const USER_LIST_META = { total: 50, page: 1, limit: 10, pages: 5 };
+
+const USER_CREATED = {
+  id: 'cluser002',
+  email: 'garage@example.com',
+  name: 'Garage Owner',
+  kind: 'GARAGE',
+  phone_number: '+441234567890',
+  email_verified_at: null,
+  approved_at: null,
+  billing_id: null,
+  created_at: '2026-06-14T10:00:00.000Z',
+  roles: [],
+};
+
 @ApiBearerAuth()
-@ApiTags('User')
+@ApiTags('Admin Users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 @Controller('admin/users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @ApiResponse({ description: 'Create a user' })
+  @ApiOperation({
+    summary: 'Create user',
+    description: 'ADMIN + JWT.',
+  })
   @ApiSuccessResponse({
-    summary: 'Create a user',
     message: 'User created successfully',
     status: HttpStatus.CREATED,
-    data: { id: 'user_id' },
-    includeAuthErrors: true,
+    data: USER_CREATED,
   })
   @Post()
   createUser(
@@ -46,91 +76,92 @@ export class UserController {
     return this.userService.createUser(createUserDto, currentUserId);
   }
 
-  @ApiResponse({ description: 'Get all users' })
+  @ApiOperation({
+    summary: 'List users',
+    description: 'ADMIN + JWT. Paginated with filters.',
+  })
   @ApiSuccessResponse({
-    summary: 'Get all users',
     message: 'Users fetched successfully',
-    data: [],
-    metaData: { total: 1, page: 1, limit: 10 },
-    includeAuthErrors: true,
+    data: [USER_LIST_ITEM],
+    metaData: USER_LIST_META,
   })
   @Get()
   findAllUsers(@Query() queryUserDto: QueryUserDto) {
     return this.userService.findAllUsers(queryUserDto);
   }
 
-  // approve user
-  @Roles(Role.ADMIN)
-  @ApiResponse({ description: 'Approve a user' })
+  @ApiOperation({
+    summary: 'Approve user',
+    description: 'ADMIN + JWT.',
+  })
   @ApiSuccessResponse({
-    summary: 'Approve a user',
     message: 'User approved successfully',
-    data: { id: 'user_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: null,
   })
   @Post(':user_id/approve')
   approveUser(@Param('user_id') user_id: string) {
     return this.userService.approveUser(user_id);
   }
 
-  // reject user
-  @Roles(Role.ADMIN)
-  @ApiResponse({ description: 'Reject a user' })
+  @ApiOperation({
+    summary: 'Reject user',
+    description: 'ADMIN + JWT.',
+  })
   @ApiSuccessResponse({
-    summary: 'Reject a user',
     message: 'User rejected successfully',
-    data: { id: 'user_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: null,
   })
   @Post(':user_id/reject')
   rejectUser(@Param('user_id') user_id: string) {
     return this.userService.rejectUser(user_id);
   }
+
+  @ApiOperation({
+    summary: 'Ban user',
+    description: 'ADMIN + JWT. Cancels garage subscriptions.',
+  })
   @ApiSuccessResponse({
-    summary: 'Ban a user',
     message: 'User banned successfully',
-    data: { id: 'user_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: { cancelled_subscriptions: 1 },
   })
   @Post(':user_id/ban')
   banUser(@Param('user_id') user_id: string) {
     return this.userService.banUser(user_id);
   }
 
+  @ApiOperation({
+    summary: 'Unban user',
+    description: 'ADMIN + JWT.',
+  })
   @ApiSuccessResponse({
-    summary: 'Unban a user',
     message: 'User unbanned successfully',
-    data: { id: 'user_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: null,
   })
   @Post(':user_id/unban')
   unbanUser(@Param('user_id') user_id: string) {
     return this.userService.unbanUser(user_id);
   }
 
-  @ApiResponse({ description: 'Get a user by id' })
+  @ApiOperation({
+    summary: 'Get user',
+    description: 'ADMIN + JWT.',
+  })
   @ApiSuccessResponse({
-    summary: 'Get a user by id',
     message: 'User fetched successfully',
-    data: { id: 'user_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: USER_LIST_ITEM,
   })
   @Get(':user_id')
   findOneUser(@Param('user_id') user_id: string) {
     return this.userService.findOneUser(user_id);
   }
 
+  @ApiOperation({
+    summary: 'Update user',
+    description: 'ADMIN + JWT.',
+  })
   @ApiSuccessResponse({
-    summary: 'Update a user',
     message: 'User updated successfully',
-    data: { id: 'user_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: null,
   })
   @Patch(':user_id')
   updateUser(
@@ -140,12 +171,21 @@ export class UserController {
     return this.userService.updateUser(user_id, updateUserDto);
   }
 
+  @ApiOperation({
+    summary: 'Delete user',
+    description: 'ADMIN + JWT. Soft delete.',
+  })
   @ApiSuccessResponse({
-    summary: 'Delete a user',
     message: 'User deleted successfully',
-    data: { id: 'user_id' },
-    includeAuthErrors: true,
-    includeNotFound: true,
+    data: {
+      user_id: 'cluser001',
+      email: 'john@example.com',
+      name: 'John Driver',
+      kind: 'DRIVER',
+      deleted_at: '2026-06-14T10:00:00.000Z',
+      deleted_records: { vehicles: 2, services: 0, subscriptions: 0 },
+      stripe_customer_id: null,
+    },
   })
   @Delete(':user_id')
   deleteUser(@Param('user_id') user_id: string) {

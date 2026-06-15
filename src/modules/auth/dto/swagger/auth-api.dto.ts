@@ -1,6 +1,29 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserAccountStatus, UserKind } from 'prisma/generated/enums';
 
+export class MeSubscriptionSummaryDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ example: 'ACTIVE' })
+  status: string;
+
+  @ApiProperty()
+  plan_id: string;
+
+  @ApiProperty({ example: 'Garage Pro' })
+  plan_name: string;
+
+  @ApiProperty()
+  has_access: boolean;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  current_period_end: Date | null;
+
+  @ApiProperty()
+  cancel_at_period_end: boolean;
+}
+
 export class MeGarageSummaryDto {
   @ApiProperty()
   id: string;
@@ -57,6 +80,13 @@ export class AuthMeUserDto {
 
   @ApiProperty({ enum: UserAccountStatus })
   status: UserAccountStatus;
+
+  @ApiPropertyOptional({
+    type: MeSubscriptionSummaryDto,
+    description: 'Present for GARAGE users with active subscription access',
+    nullable: true,
+  })
+  subscription?: MeSubscriptionSummaryDto | null;
 }
 
 export class AuthMeResponseDto {

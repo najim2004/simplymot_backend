@@ -1,9 +1,10 @@
+import { Injectable } from '@nestjs/common';
 import { randomInt, randomBytes } from 'crypto';
 import { v4 as uuid } from 'uuid';
 import { DateHelper } from '../../helper/date.helper';
 import { UserRepository } from '../user/user.repository';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { Injectable } from '@nestjs/common';
+import { UcodeStatus } from 'prisma/generated/enums';
 
 @Injectable()
 export class UcodeRepository {
@@ -155,7 +156,7 @@ export class UcodeRepository {
           email: params.email,
           token: token,
           expired_at: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-          status: 1,
+          status: UcodeStatus.ACTIVE,
         },
       });
 

@@ -1,40 +1,33 @@
-import { applyDecorators, HttpStatus } from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
-  ApiCreatedResponse,
-  ApiForbiddenResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiUnauthorizedResponse,
-} from '@nestjs/swagger';
+import { applyDecorators, HttpStatus, Type } from '@nestjs/common';
+import { ApiCreatedResponse, ApiOkResponse, getSchemaPath } from '@nestjs/swagger';
 
 type ApiSuccessResponseOptions = {
-  summary: string;
-  description?: string;
   message?: string;
   status?: HttpStatus.OK | HttpStatus.CREATED;
   data?: Record<string, unknown> | unknown[];
   metaData?: Record<string, unknown>;
-  includeAuthErrors?: boolean;
-  includeNotFound?: boolean;
+  type?: Type<unknown>;
 };
 
+/**
+ * Documents the success response body only.
+ * Pair every usage with `@ApiOperation({ summary, description })` on the same handler.
+ */
 export function ApiSuccessResponse({
-  summary,
-  description,
   message = 'Operation completed successfully',
   status = HttpStatus.OK,
   data = {},
   metaData,
-  includeAuthErrors = false,
-  includeNotFound = false,
+  type,
 }: ApiSuccessResponseOptions) {
   const responseDecorator =
     status === HttpStatus.CREATED ? ApiCreatedResponse : ApiOkResponse;
 
+  if (type) {
+    return applyDecorators(responseDecorator({ type }));
+  }
+
   return applyDecorators(
-    ApiOperation({ summary, description }),
     responseDecorator({
       schema: {
         example: {
@@ -45,15 +38,45 @@ export function ApiSuccessResponse({
         },
       },
     }),
-    ApiBadRequestResponse({ description: 'Validation or business rule error' }),
-    ...(includeAuthErrors
-      ? [
-          ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' }),
-          ApiForbiddenResponse({ description: 'Insufficient permissions' }),
-        ]
-      : []),
-    ...(includeNotFound
-      ? [ApiNotFoundResponse({ description: 'Resource not found' })]
-      : []),
+  );
+}
+
+export function ApiSuccessEnvelope<T extends Type<unknown>>(
+  dataType: T,
+  options: {
+    isArray?: boolean;
+    hasMeta?: boolean;
+    status?: HttpStatus.OK | HttpStatus.CREATED;
+  } = {},
+) {
+  const responseDecorator =
+    options.status === HttpStatus.CREATED
+      ? ApiCreatedResponse
+      : ApiOkResponse;
+
+  const dataSchema = options.isArray
+    ? { type: 'array', items: { $ref: getSchemaPath(dataType) } }
+    : { $ref: getSchemaPath(dataType) };
+
+  return applyDecorators(
+    responseDecorator({
+      schema: {
+        type: 'object',
+        required: ['success', 'message', 'data'],
+        properties: {
+          success: { type: 'boolean', example: true },
+          message: { type: 'string' },
+          data: dataSchema,
+          ...(options.hasMeta
+            ? {
+                meta_data: {
+                  type: 'object',
+                  additionalProperties: true,
+                },
+              }
+            : {}),
+        },
+      },
+    }),
   );
 }
