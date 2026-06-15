@@ -1,15 +1,23 @@
-import { Controller, Post, Req, Headers } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Req,
+  Headers,
+  BadRequestException,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { StripeService } from './stripe.service';
 import { Request } from 'express';
-import { TransactionRepository } from '../../../common/repository/transaction/transaction.repository';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Stripe')
 @Controller('payment/stripe')
 export class StripeController {
+  private readonly logger = new Logger(StripeController.name);
+
   constructor(
     private readonly stripeService: StripeService,
-    private transactionRepository: TransactionRepository,
   ) {}
 
   @ApiOperation({ summary: 'Handle Stripe webhook events' })
@@ -23,9 +31,25 @@ export class StripeController {
     @Headers('stripe-signature') signature: string,
     @Req() req: Request,
   ) {
+    if (!signature) {
+      throw new BadRequestException('Missing stripe-signature header');
+    }
+
+    const payload = req.rawBody?.toString();
+    if (!payload) {
+      throw new BadRequestException('Missing webhook payload raw body');
+    }
+
+    let event;
     try {
-      const payload = req.rawBody.toString();
-      const event = await this.stripeService.handleWebhook(payload, signature);
+      event = await this.stripeService.handleWebhook(payload, signature);
+    } catch (error) {
+      this.logger.error(`Webhook signature verification failed: ${error.message}`);
+      throw new BadRequestException(`Webhook verification failed: ${error.message}`);
+    }
+
+    try {
+      this.logger.log(`Processing Stripe webhook event: ${event.type} (${event.id})`);
 
       // Handle events
       switch (event.type) {
@@ -40,63 +64,27 @@ export class StripeController {
         case 'payment_intent.created':
           break;
         case 'payment_intent.succeeded':
-          const paymentIntent = event.data.object;
-          // create tax transaction
-          // await StripePayment.createTaxTransaction(
-          //   paymentIntent.metadata['tax_calculation'],
-          // );
-          // Update transaction status in database
-          await this.transactionRepository.updateTransaction({
-            reference_number: paymentIntent.id,
-            status: 'succeeded',
-            paid_amount: paymentIntent.amount / 100, // amount in dollars
-            paid_currency: paymentIntent.currency,
-            raw_status: paymentIntent.status,
-          });
-          break;
         case 'payment_intent.payment_failed':
-          const failedPaymentIntent = event.data.object;
-          // Update transaction status in database
-          await this.transactionRepository.updateTransaction({
-            reference_number: failedPaymentIntent.id,
-            status: 'failed',
-            raw_status: failedPaymentIntent.status,
-          });
-          break;
         case 'payment_intent.canceled':
-          const canceledPaymentIntent = event.data.object;
-          // Update transaction status in database
-          await this.transactionRepository.updateTransaction({
-            reference_number: canceledPaymentIntent.id,
-            status: 'canceled',
-            raw_status: canceledPaymentIntent.status,
-          });
-          break;
         case 'payment_intent.requires_action':
-          const requireActionPaymentIntent = event.data.object;
-          // Update transaction status in database
-          await this.transactionRepository.updateTransaction({
-            reference_number: requireActionPaymentIntent.id,
-            status: 'requires_action',
-            raw_status: requireActionPaymentIntent.status,
-          });
+          await this.stripeService.handlePaymentIntentEvent(event);
           break;
         case 'payout.paid':
           const paidPayout = event.data.object;
-          console.log(paidPayout);
+          this.logger.log(`Payout paid: ${paidPayout.id}`);
           break;
         case 'payout.failed':
           const failedPayout = event.data.object;
-          console.log(failedPayout);
+          this.logger.error(`Payout failed: ${failedPayout.id}`);
           break;
         default:
-          console.log(`Unhandled event type ${event.type}`);
+          this.logger.debug(`Unhandled event type ${event.type}`);
       }
 
       return { received: true };
     } catch (error) {
-      console.error('Webhook error', error);
-      return { received: false };
+      this.logger.error(`Failed to process Stripe webhook event ${event.type}: ${error.message}`, error.stack);
+      throw new InternalServerErrorException(`Webhook processing error: ${error.message}`);
     }
   }
 }

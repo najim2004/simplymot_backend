@@ -22,6 +22,7 @@ import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { QuerySubscriptionDto } from './dto/query-subscription.dto';
 import { CancelSubscriptionDto } from './dto/update-subscription.dto';
 import { PromoCodeRepository } from 'src/common/repository/promo-code/promo-code.repository';
+import { SubscriptionRepository } from 'src/common/repository/subscription/subscription.repository';
 
 type SubscriptionWithPlan = Prisma.SubscriptionGetPayload<{
   include: {
@@ -45,6 +46,7 @@ export class SubscriptionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly promoCodeRepository: PromoCodeRepository,
+    private readonly subscriptionRepository: SubscriptionRepository,
   ) {}
 
   async getActivePlans(user_id: string, query: QuerySubscriptionDto = {}) {
@@ -438,7 +440,7 @@ export class SubscriptionService {
     const stripeSubscription =
       await StripePayment.retrieveSubscription(stripeSubscriptionId);
 
-    const subscription = await this.applyStripeSubscriptionToLocalRecord(
+    const subscription = await this.subscriptionRepository.applyStripeSubscriptionToLocalRecord(
       stripeSubscription,
       {
         subscription_id: session.metadata?.subscription_id,
@@ -457,151 +459,7 @@ export class SubscriptionService {
     });
   }
 
-  async applyStripeSubscriptionToLocalRecord(
-    stripeSubscription: Stripe.Subscription,
-    hints: {
-      subscription_id?: string | null;
-      user_id?: string | null;
-      plan_id?: string | null;
-      stripe_promotion_code_id?: string | null;
-    } = {},
-  ): Promise<SubscriptionWithPlan> {
-    const stripeSubscriptionId = stripeSubscription.id;
-    const stripeCustomerId = this.getStripeCustomerId(stripeSubscription);
-    const periods = this.extractStripePeriods(stripeSubscription);
-    const mappedStatus = this.mapStripeStatus(stripeSubscription.status);
 
-    const localSubscription =
-      (hints.subscription_id
-        ? await this.prisma.subscription.findUnique({
-            where: { id: hints.subscription_id },
-          })
-        : null) ||
-      (await this.prisma.subscription.findFirst({
-        where: { stripe_subscription_id: stripeSubscriptionId },
-      }));
-
-    if (!localSubscription && (!hints.user_id || !hints.plan_id)) {
-      throw new NotFoundException('Local subscription record not found');
-    }
-
-    const subscription = localSubscription
-      ? await this.prisma.subscription.update({
-          where: { id: localSubscription.id },
-          data: {
-            status: mappedStatus,
-            stripe_subscription_id: stripeSubscriptionId,
-            stripe_customer_id: stripeCustomerId,
-            current_period_start:
-              periods.current_period_start ??
-              localSubscription.current_period_start,
-            current_period_end:
-              periods.current_period_end ??
-              localSubscription.current_period_end,
-            next_billing_date:
-              periods.current_period_end ?? localSubscription.next_billing_date,
-            cancel_at_period_end:
-              stripeSubscription.cancel_at_period_end ?? false,
-            cancel_at: stripeSubscription.cancel_at
-              ? new Date(stripeSubscription.cancel_at * 1000)
-              : null,
-          },
-          include: this.subscriptionInclude(),
-        })
-      : await this.createSubscriptionFromStripe(
-          stripeSubscription,
-          hints.user_id,
-          hints.plan_id,
-          stripeCustomerId,
-          mappedStatus,
-          periods,
-        );
-
-    if (stripeCustomerId) {
-      await this.prisma.user.updateMany({
-        where: {
-          id: subscription.user_id,
-          OR: [{ billing_id: null }, { billing_id: { not: stripeCustomerId } }],
-        },
-        data: {
-          billing_id: stripeCustomerId,
-        },
-      });
-    }
-
-    await this.promoCodeRepository.markRedeemedByStripePromotionCode(
-      hints.stripe_promotion_code_id,
-    );
-
-    await this.prisma.auditLog.create({
-      data: {
-        table_name: 'Subscription',
-        record_id: subscription.id,
-        action: localSubscription ? AuditAction.UPDATE : AuditAction.CREATE,
-        actor_id: hints.user_id || subscription.user_id || 'stripe_webhook',
-        actor_type: hints.user_id ? 'user' : 'webhook',
-        old_values: localSubscription ? (localSubscription as any) : null,
-        new_values: subscription as any,
-        metadata: {
-          stripe_subscription_id: stripeSubscriptionId,
-          event: localSubscription
-            ? 'subscription_updated'
-            : 'subscription_created',
-        },
-      },
-    });
-
-    return subscription;
-  }
-
-  async markStripeSubscriptionDeleted(stripeSubscription: Stripe.Subscription) {
-    const stripeSubscriptionId = stripeSubscription.id;
-    const periods = this.extractStripePeriods(stripeSubscription);
-
-    const subscription = await this.prisma.subscription.findFirst({
-      where: { stripe_subscription_id: stripeSubscriptionId },
-    });
-
-    if (subscription) {
-      const updated = await this.prisma.subscription.update({
-        where: { id: subscription.id },
-        data: {
-          status: SubscriptionStatus.CANCELLED,
-          cancel_at:
-            stripeSubscription.canceled_at || stripeSubscription.cancel_at
-              ? new Date(
-                  (stripeSubscription.canceled_at ||
-                    stripeSubscription.cancel_at) * 1000,
-                )
-              : new Date(),
-          cancel_at_period_end: false,
-          current_period_end: periods.current_period_end,
-          next_billing_date: null,
-        },
-      });
-
-      await this.prisma.auditLog.create({
-        data: {
-          table_name: 'Subscription',
-          record_id: subscription.id,
-          action: AuditAction.CANCELLATION,
-          actor_id: 'stripe_webhook',
-          actor_type: 'webhook',
-          old_values: {
-            status: subscription.status,
-          },
-          new_values: {
-            status: SubscriptionStatus.CANCELLED,
-            cancel_at: updated.cancel_at,
-          },
-          metadata: {
-            event: 'customer.subscription.deleted',
-            stripe_subscription_id: stripeSubscriptionId,
-          },
-        },
-      });
-    }
-  }
 
   private async ensureGarageUser(user_id: string) {
     const user = await this.prisma.user.findFirst({
@@ -792,45 +650,7 @@ export class SubscriptionService {
     } satisfies Prisma.SubscriptionInclude;
   }
 
-  private async createSubscriptionFromStripe(
-    stripeSubscription: Stripe.Subscription,
-    user_id: string,
-    plan_id: string,
-    stripeCustomerId: string | null,
-    status: SubscriptionStatus,
-    periods: {
-      current_period_start: Date | null;
-      current_period_end: Date | null;
-    },
-  ) {
-    const plan = await this.prisma.subscriptionPlan.findUnique({
-      where: { id: plan_id },
-    });
 
-    if (!plan) {
-      throw new NotFoundException('Subscription plan not found');
-    }
-
-    return await this.prisma.subscription.create({
-      data: {
-        user_id,
-        plan_id,
-        status,
-        stripe_subscription_id: stripeSubscription.id,
-        stripe_customer_id: stripeCustomerId,
-        price_pence: plan.price_pence,
-        currency: plan.currency,
-        current_period_start: periods.current_period_start,
-        current_period_end: periods.current_period_end,
-        next_billing_date: periods.current_period_end,
-        cancel_at_period_end: stripeSubscription.cancel_at_period_end ?? false,
-        cancel_at: stripeSubscription.cancel_at
-          ? new Date(stripeSubscription.cancel_at * 1000)
-          : null,
-      },
-      include: this.subscriptionInclude(),
-    });
-  }
 
   private formatSubscription(subscription: SubscriptionWithPlan) {
     const trial = this.getTrialInformation(subscription);
@@ -999,29 +819,12 @@ export class SubscriptionService {
       : session.subscription.id;
   }
 
-  private getStripeCustomerId(stripeSubscription: Stripe.Subscription) {
-    if (!stripeSubscription.customer) return null;
-    return typeof stripeSubscription.customer === 'string'
-      ? stripeSubscription.customer
-      : stripeSubscription.customer.id;
-  }
+
 
   private extractStripePeriods(stripeSubscription: Stripe.Subscription) {
-    const item = stripeSubscription.items?.data?.[0] as
-      | (Stripe.SubscriptionItem & {
-          current_period_start?: number;
-          current_period_end?: number;
-        })
-      | undefined;
-    const stripeWithLegacyPeriod = stripeSubscription as Stripe.Subscription & {
-      current_period_start?: number;
-      current_period_end?: number;
-    };
-
-    const start =
-      item?.current_period_start ?? stripeWithLegacyPeriod.current_period_start;
-    const end =
-      item?.current_period_end ?? stripeWithLegacyPeriod.current_period_end;
+    const sub = stripeSubscription as any;
+    const start = sub.current_period_start;
+    const end = sub.current_period_end;
 
     return {
       current_period_start: start ? new Date(start * 1000) : null,
@@ -1029,26 +832,5 @@ export class SubscriptionService {
     };
   }
 
-  private mapStripeStatus(status: Stripe.Subscription.Status) {
-    switch (status) {
-      case 'trialing':
-        return SubscriptionStatus.TRIALING;
-      case 'active':
-        return SubscriptionStatus.ACTIVE;
-      case 'past_due':
-        return SubscriptionStatus.PAST_DUE;
-      case 'unpaid':
-        return SubscriptionStatus.UNPAID;
-      case 'paused':
-        return SubscriptionStatus.PAUSED;
-      case 'canceled':
-        return SubscriptionStatus.CANCELLED;
-      case 'incomplete_expired':
-        return SubscriptionStatus.CANCELLED;
-      case 'incomplete':
-        return SubscriptionStatus.INACTIVE;
-      default:
-        return SubscriptionStatus.INACTIVE;
-    }
-  }
+
 }
