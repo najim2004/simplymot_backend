@@ -92,4 +92,12 @@ export class RescheduleBookingDto {
   @Validate(RescheduleIsEndAfterStartConstraint)
   @Validate(RescheduleIsFutureDateConstraint)
   end_time?: Date;
+
+  @ApiPropertyOptional({
+    description: 'Reason for rescheduling the booking',
+    example: 'Customer requested a later slot',
+  })
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }

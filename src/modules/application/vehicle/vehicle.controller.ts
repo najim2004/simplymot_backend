@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { VehicleService } from './vehicle.service';
 import { AddVehicleDto } from './dto/create-vehicle.dto';
-import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { User } from 'src/modules/auth/decorators/get-user.decorator';
 import { QueryMotHistoryDto } from './dto/query-vehicle.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -72,8 +71,11 @@ export class VehicleController {
     includeAuthErrors: true,
     includeNotFound: true,
   })
-  @Delete(':id')
-  deleteVehicle(@Param('id') vehicle_id: string, @User('id') user_id: string) {
+  @Delete(':vehicle_id')
+  deleteVehicle(
+    @Param('vehicle_id') vehicle_id: string,
+    @User('id') user_id: string,
+  ) {
     return this.vehicleService.deleteVehicle(vehicle_id, user_id);
   }
 }

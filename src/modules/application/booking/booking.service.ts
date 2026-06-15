@@ -9,6 +9,7 @@ import {
   BookingStatus,
   TimeSlotStatus,
   UserKind,
+  AuditAction,
 } from 'prisma/generated/enums';
 import { Prisma } from 'prisma/generated/client';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -248,6 +249,21 @@ export class BookingService {
       await tx.timeSlot.update({
         where: { id: slotId },
         data: { booking_id: createdBooking.id },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          table_name: 'Booking',
+          record_id: createdBooking.id,
+          action: AuditAction.CREATE,
+          actor_id: user_id,
+          actor_type: 'user',
+          garage_id: createBookingDto.garage_id,
+          new_values: createdBooking as any,
+          metadata: {
+            created_by: 'DRIVER',
+          },
+        },
       });
 
       return createdBooking;
@@ -882,6 +898,29 @@ export class BookingService {
         }
       }
 
+      await tx.auditLog.create({
+        data: {
+          table_name: 'Booking',
+          record_id: booking.id,
+          action: AuditAction.UPDATE,
+          actor_id: user_id,
+          actor_type: 'user',
+          garage_id: booking.garage_id,
+          old_values: {
+            slot_id: booking.slot_id,
+            order_date: booking.slot?.ends_at,
+          },
+          new_values: {
+            slot_id: newSlotId,
+            order_date: startsAt,
+          },
+          metadata: {
+            rescheduled_by: 'GARAGE',
+            reason: rescheduleBookingDto.reason ?? null,
+          },
+        },
+      });
+
       return updated;
     });
 
@@ -983,6 +1022,31 @@ export class BookingService {
           });
         }
       }
+
+      await tx.auditLog.create({
+        data: {
+          table_name: 'Booking',
+          record_id: booking.id,
+          action: AuditAction.CANCELLATION,
+          actor_id: user_id,
+          actor_type: 'user',
+          garage_id: booking.garage_id,
+          old_values: {
+            status: booking.status,
+            cancel_reason: null,
+            cancelled_by: null,
+          },
+          new_values: {
+            status: BookingStatus.CANCELLED,
+            cancel_reason: cancelBookingDto.reason,
+            cancelled_by: cancelledBy,
+          },
+          metadata: {
+            cancelled_by: cancelledBy,
+            reason: cancelBookingDto.reason,
+          },
+        },
+      });
 
       return updated;
     });

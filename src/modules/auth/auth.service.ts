@@ -31,10 +31,7 @@ import {
   VerifyEmailDto,
   CheckOTPValidationDto,
 } from './dto/auth.dto';
-import {
-  UserAccountStatus,
-  UserKind,
-} from 'prisma/generated/enums';
+import { UserAccountStatus, UserKind } from 'prisma/generated/enums';
 import { Prisma } from 'prisma/generated/client';
 import { PostCodeMapRepository } from 'src/common/repository/post-code-map/post-code-map.repository';
 import { SubscriptionService } from '../application/subscription/subscription.service';
@@ -141,16 +138,18 @@ export class AuthService {
             id: roleUser.role.id,
             title: roleUser.role.title,
             name: roleUser.role.name,
-            permissions: roleUser.role.permission_roles.map((permissionRole) => {
-              return {
-                id: permissionRole.permission.id,
-                title: permissionRole.permission.title,
-                action: permissionRole.permission.action,
-                subject: permissionRole.permission.subject,
-                conditions: permissionRole.permission.conditions,
-                fields: permissionRole.permission.fields,
-              };
-            }),
+            permissions: roleUser.role.permission_roles.map(
+              (permissionRole) => {
+                return {
+                  id: permissionRole.permission.id,
+                  title: permissionRole.permission.title,
+                  action: permissionRole.permission.action,
+                  subject: permissionRole.permission.subject,
+                  conditions: permissionRole.permission.conditions,
+                  fields: permissionRole.permission.fields,
+                };
+              },
+            ),
           };
         });
       }

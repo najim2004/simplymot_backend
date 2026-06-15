@@ -901,6 +901,79 @@ export class GarageService {
     });
   }
 
+  async discoverGarage(garage_id: string) {
+    const garage = await this.prisma.garage.findUnique({
+      where: {
+        id: garage_id,
+      },
+      include: {
+        services: {
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            type: true,
+          },
+          orderBy: {
+            created_at: 'desc',
+          },
+        },
+        schedule: {
+          select: {
+            id: true,
+            schedule_intervals: {
+              select: {
+                id: true,
+                day_of_week: true,
+                is_closed: true,
+                slot_duration: true,
+                buffer_time: true,
+                open_time: true,
+                close_time: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!garage) {
+      throw new NotFoundException('Garage not found');
+    }
+
+    const services = garage.services || [];
+    const formattedServices = {
+      mot: services.find((service) => service.type === ServiceType.MOT) || null,
+      mot_retest:
+        services.find((service) => service.type === ServiceType.RETEST) || null,
+      other_services: services.filter(
+        (service) =>
+          service.type !== ServiceType.MOT &&
+          service.type !== ServiceType.RETEST,
+      ),
+    };
+
+    const formattedGarage = {
+      id: garage.id,
+      garage_name: garage.garage_name || 'Unnamed Garage',
+      vts_number: garage.vts_number || 'VTS not provided',
+      contact_email: garage.contact_email || 'Email not provided',
+      phone_number: garage.phone_number || 'Phone not provided',
+      address: garage.address || 'Address not provided',
+      post_code: garage.post_code || '',
+      garage_image: garage.garage_image
+        ? SojebStorage.url(garage.garage_image)
+        : null,
+      services: formattedServices,
+      schedule: garage.schedule,
+    };
+
+    return ResponseHelper.success({
+      message: 'Garage details fetched successfully',
+      data: formattedGarage,
+    });
+  }
+
   async discoverGarages(query: DiscoverGarageQueryDto, user_id?: string) {
     const {
       vehicle_registration_number,

@@ -14,6 +14,7 @@ import {
   SubscriptionPlanStatus,
   SubscriptionStatus,
   UserKind,
+  AuditAction,
 } from 'prisma/generated/enums';
 import { Prisma } from 'prisma/generated/client';
 import type Stripe from 'stripe';
@@ -179,7 +180,10 @@ export class SubscriptionService {
     };
   }
 
-  async subscribe(user_id: string, createSubscriptionDto: CreateSubscriptionDto) {
+  async subscribe(
+    user_id: string,
+    createSubscriptionDto: CreateSubscriptionDto,
+  ) {
     const user = await this.ensureGarageUser(user_id);
 
     const existingSubscription =
@@ -367,6 +371,31 @@ export class SubscriptionService {
       },
     });
 
+    await this.prisma.auditLog.create({
+      data: {
+        table_name: 'Subscription',
+        record_id: subscription.id,
+        action: AuditAction.CANCELLATION,
+        actor_id: user_id,
+        actor_type: 'user',
+        old_values: {
+          status: subscription.status,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+        },
+        new_values: {
+          status: updatedSubscription.status,
+          cancel_at_period_end: updatedSubscription.cancel_at_period_end,
+          cancel_at: updatedSubscription.cancel_at,
+          cancellation_reason: updatedSubscription.cancellation_reason,
+        },
+        metadata: {
+          cancelled_by: 'GARAGE',
+          cancel_immediately: cancelImmediately,
+          reason: dto.reason ?? null,
+        },
+      },
+    });
+
     return ResponseHelper.success({
       message: cancelImmediately
         ? 'Subscription cancelled immediately'
@@ -504,6 +533,22 @@ export class SubscriptionService {
       hints.stripe_promotion_code_id,
     );
 
+    await this.prisma.auditLog.create({
+      data: {
+        table_name: 'Subscription',
+        record_id: subscription.id,
+        action: localSubscription ? AuditAction.UPDATE : AuditAction.CREATE,
+        actor_id: hints.user_id || subscription.user_id || 'stripe_webhook',
+        actor_type: hints.user_id ? 'user' : 'webhook',
+        old_values: localSubscription ? (localSubscription as any) : null,
+        new_values: subscription as any,
+        metadata: {
+          stripe_subscription_id: stripeSubscriptionId,
+          event: localSubscription ? 'subscription_updated' : 'subscription_created',
+        },
+      },
+    });
+
     return subscription;
   }
 
@@ -511,22 +556,49 @@ export class SubscriptionService {
     const stripeSubscriptionId = stripeSubscription.id;
     const periods = this.extractStripePeriods(stripeSubscription);
 
-    await this.prisma.subscription.updateMany({
+    const subscription = await this.prisma.subscription.findFirst({
       where: { stripe_subscription_id: stripeSubscriptionId },
-      data: {
-        status: SubscriptionStatus.CANCELLED,
-        cancel_at:
-          stripeSubscription.canceled_at || stripeSubscription.cancel_at
-            ? new Date(
-                (stripeSubscription.canceled_at ||
-                  stripeSubscription.cancel_at) * 1000,
-              )
-            : new Date(),
-        cancel_at_period_end: false,
-        current_period_end: periods.current_period_end,
-        next_billing_date: null,
-      },
     });
+
+    if (subscription) {
+      const updated = await this.prisma.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          status: SubscriptionStatus.CANCELLED,
+          cancel_at:
+            stripeSubscription.canceled_at || stripeSubscription.cancel_at
+              ? new Date(
+                  (stripeSubscription.canceled_at ||
+                    stripeSubscription.cancel_at) * 1000,
+                )
+              : new Date(),
+          cancel_at_period_end: false,
+          current_period_end: periods.current_period_end,
+          next_billing_date: null,
+        },
+      });
+
+      await this.prisma.auditLog.create({
+        data: {
+          table_name: 'Subscription',
+          record_id: subscription.id,
+          action: AuditAction.CANCELLATION,
+          actor_id: 'stripe_webhook',
+          actor_type: 'webhook',
+          old_values: {
+            status: subscription.status,
+          },
+          new_values: {
+            status: SubscriptionStatus.CANCELLED,
+            cancel_at: updated.cancel_at,
+          },
+          metadata: {
+            event: 'customer.subscription.deleted',
+            stripe_subscription_id: stripeSubscriptionId,
+          },
+        },
+      });
+    }
   }
 
   private async ensureGarageUser(user_id: string) {

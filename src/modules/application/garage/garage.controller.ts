@@ -29,6 +29,10 @@ import {
   GetGarageSlotsQueryDto,
 } from './dto/query-garage.dto';
 import { OptionalJwtAuthGuard } from 'src/modules/auth/guards/optional-jwt-auth.guard';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guard/role/roles.guard';
+import { Roles } from 'src/common/guard/role/roles.decorator';
+import { Role } from 'src/common/guard/role/role.enum';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
 
@@ -45,6 +49,8 @@ export class GarageController {
     includeAuthErrors: true,
   })
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   getGarage(@User('id') id: string) {
     return this.garageService.getGarage(id);
   }
@@ -64,6 +70,18 @@ export class GarageController {
     return this.garageService.discoverGarages(query, user_id);
   }
 
+  @ApiSuccessResponse({
+    summary: 'Get discover garage by ID',
+    message: 'Garage details fetched successfully',
+    data: { id: 'garage_id' },
+    includeNotFound: true,
+  })
+  @Get('discover/:garage_id')
+  @UseGuards(OptionalJwtAuthGuard)
+  discoverGarage(@Param('garage_id') garage_id: string) {
+    return this.garageService.discoverGarage(garage_id);
+  }
+
   // ---------------- SCHEDULE ----------------
   @ApiSuccessResponse({
     summary: 'Get garage schedule',
@@ -73,6 +91,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Get(':garage_id/schedule')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   getSchedule(
     @Param('garage_id') garage_id: string,
     @User('id') user_id: string,
@@ -88,6 +108,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Put(':garage_id/schedule')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   upsertSchedule(
     @Param('garage_id') garage_id: string,
     @Body() upsertSchedule: UpsertScheduleDto,
@@ -108,6 +130,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Post(':garage_id/schedule/:schedule_id/break_times')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   createBreakTime(
     @Param('garage_id') garage_id: string,
     @Param('schedule_id') schedule_id: string,
@@ -130,6 +154,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Get(':garage_id/schedule/:schedule_id/break_times')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   getBreakTimes(
     @Param('garage_id') garage_id: string,
     @Param('schedule_id') schedule_id: string,
@@ -146,6 +172,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Delete(':garage_id/schedule/:schedule_id/break_times/:break_time_id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   deleteBreakTime(
     @Param('garage_id') garage_id: string,
     @Param('schedule_id') schedule_id: string,
@@ -168,6 +196,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Post(':garage_id/schedule/:schedule_id/holidays')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   createHoliday(
     @Param('garage_id') garage_id: string,
     @Param('schedule_id') schedule_id: string,
@@ -190,6 +220,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Get(':garage_id/schedule/:schedule_id/holidays')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   getHolidays(
     @Param('garage_id') garage_id: string,
     @Param('schedule_id') schedule_id: string,
@@ -212,6 +244,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Delete(':garage_id/schedule/:schedule_id/holidays/:holiday_id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   deleteHoliday(
     @Param('garage_id') garage_id: string,
     @Param('schedule_id') schedule_id: string,
@@ -235,6 +269,7 @@ export class GarageController {
     includeNotFound: true,
   })
   @Get(':garage_id/slots')
+  @UseGuards(OptionalJwtAuthGuard)
   getSlots(
     @Param('garage_id') garage_id: string,
     @Query() query: GetGarageSlotsQueryDto,
@@ -249,6 +284,8 @@ export class GarageController {
     includeAuthErrors: true,
   })
   @Patch(':garage_id/slots/block')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   blockSlots(
     @Param('garage_id') garage_id: string,
     @Body() blockSlotsDto: BlockUnblockSlotsDto,
@@ -267,6 +304,8 @@ export class GarageController {
     includeAuthErrors: true,
   })
   @Patch(':garage_id/slots/unblock')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   unblockSlots(
     @Param('garage_id') garage_id: string,
     @Body() unblockSlotsDto: BlockUnblockSlotsDto,
@@ -287,6 +326,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Get(':garage_id/services')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   getServices(
     @Param('garage_id') garage_id: string,
     @User('id') user_id: string,
@@ -302,6 +343,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Put(':garage_id/services')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   upsertService(
     @Param('garage_id') garage_id: string,
     @Body() upsertServiceDto: UpsertServiceDto,
@@ -322,6 +365,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Delete(':garage_id/services/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   deleteService(@Param('id') id: string, @User('id') user_id: string) {
     return this.garageService.deleteService(id, user_id);
   }
@@ -337,6 +382,8 @@ export class GarageController {
     includeNotFound: true,
   })
   @Patch(':garage_id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GARAGE)
   @UseInterceptors(
     FileInterceptor('garage_image', {
       limits: {
