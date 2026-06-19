@@ -998,12 +998,12 @@ export class GarageService {
     );
     const sortDirection = sort_order === SortOrder.DESC ? 'DESC' : 'ASC';
 
-    const sortSql =
+    const userSortSql =
       sort === Sort.PRICE
-        ? Prisma.sql`mot_price ${Prisma.raw(sortDirection)} NULLS LAST,`
+        ? Prisma.sql`mot_price ${Prisma.raw(sortDirection)} NULLS LAST`
         : sort === Sort.RATING || sort === Sort.REVIEWS
-          ? Prisma.sql`booking_count ${Prisma.raw(sortDirection)} NULLS LAST,`
-          : Prisma.empty;
+          ? Prisma.sql`booking_count ${Prisma.raw(sortDirection)} NULLS LAST`
+          : Prisma.sql`distance_miles ${Prisma.raw(sortDirection)} NULLS LAST`;
 
     const [rows, count] = await Promise.all([
       this.prisma.$queryRaw<
@@ -1036,53 +1036,67 @@ export class GarageService {
           FROM "garages" g
           LEFT JOIN "post_code_map" pcm
             ON pcm.postcode = regexp_replace(upper(coalesce(g.post_code, '')), '\\s+', '', 'g')
-        )
-        SELECT
-          gl.id,
-          gl.garage_name,
-          gl.address,
-          gl.post_code,
-          gl.vts_number,
-          gl.phone_number,
-          gl.garage_image,
-          gl.normalized_post_code = ${postCodeNoSpace} AS exact_post_code_match,
-          CASE
-            WHEN gl.garage_latitude IS NOT NULL AND gl.garage_longitude IS NOT NULL THEN
-              (
-                3959 * acos(
-                  least(
-                    1,
-                    greatest(
-                      -1,
-                      cos(radians(${center.lat})) * cos(radians(gl.garage_latitude)) *
-                      cos(radians(gl.garage_longitude) - radians(${center.lng})) +
-                      sin(radians(${center.lat})) * sin(radians(gl.garage_latitude))
+        ),
+        discovered_garages AS (
+          SELECT
+            gl.id,
+            gl.garage_name,
+            gl.address,
+            gl.post_code,
+            gl.vts_number,
+            gl.phone_number,
+            gl.garage_image,
+            gl.normalized_post_code = ${postCodeNoSpace} AS exact_post_code_match,
+            CASE
+              WHEN gl.garage_latitude IS NOT NULL AND gl.garage_longitude IS NOT NULL THEN
+                (
+                  3959 * acos(
+                    least(
+                      1,
+                      greatest(
+                        -1,
+                        cos(radians(${center.lat})) * cos(radians(gl.garage_latitude)) *
+                        cos(radians(gl.garage_longitude) - radians(${center.lng})) +
+                        sin(radians(${center.lat})) * sin(radians(gl.garage_latitude))
+                      )
                     )
                   )
                 )
-              )
-            ELSE NULL
-          END AS distance_miles,
-          mot.price::float8 AS mot_price,
-          (
-            SELECT COUNT(*)::int
-            FROM "bookings" b
-            WHERE b.garage_id = gl.id
-          ) AS booking_count
-        FROM garage_locations gl
-        LEFT JOIN LATERAL (
-          SELECT s.price
-          FROM "services" s
-          WHERE s.garage_id = gl.id AND s.type = 'MOT'
-          LIMIT 1
-        ) mot ON TRUE
+              ELSE NULL
+            END AS distance_miles,
+            mot.price::float8 AS mot_price,
+            (
+              SELECT COUNT(*)::int
+              FROM "bookings" b
+              WHERE b.garage_id = gl.id
+            ) AS booking_count
+          FROM garage_locations gl
+          LEFT JOIN LATERAL (
+            SELECT s.price
+            FROM "services" s
+            WHERE s.garage_id = gl.id AND s.type = 'MOT'
+            LIMIT 1
+          ) mot ON TRUE
+        )
+        SELECT
+          id,
+          garage_name,
+          address,
+          post_code,
+          vts_number,
+          phone_number,
+          garage_image,
+          exact_post_code_match,
+          distance_miles,
+          mot_price,
+          booking_count
+        FROM discovered_garages
         ORDER BY
           exact_post_code_match DESC,
           CASE WHEN distance_miles IS NULL THEN 1 ELSE 0 END ASC,
-          distance_miles ASC NULLS LAST,
-          ${sortSql}
-          gl.garage_name ASC NULLS LAST,
-          gl.id ASC
+          ${userSortSql},
+          garage_name ASC NULLS LAST,
+          id ASC
         LIMIT ${safeLimit}
         OFFSET ${offset};
       `),

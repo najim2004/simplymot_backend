@@ -22,18 +22,28 @@ export class UcodeRepository {
     expired_at = null,
     isOtp = false,
     email = null,
-  }): Promise<string> {
+    otpDigits = 5,
+  }: {
+    userId: string;
+    expired_at?: Date | null;
+    isOtp?: boolean;
+    email?: string | null;
+    otpDigits?: number;
+  }): Promise<string | null> {
     // OTP valid for 5 minutes
     const otpExpiryTime = 5 * 60 * 1000;
     expired_at = new Date(Date.now() + otpExpiryTime);
 
     const userDetails = await this.userRepository.getUserDetails(userId);
     if (userDetails && userDetails.email) {
+      if (isOtp) {
+        await this.deleteAllOtpsByUser(userId);
+      }
+
       let token: string;
       if (isOtp) {
-        // create 6 digit otp code
-        // token = String(Math.floor(100000 + Math.random() * 900000));
-        token = String(randomInt(100000, 1000000));
+        const max = 10 ** otpDigits;
+        token = String(randomInt(0, max)).padStart(otpDigits, '0');
       } else {
         token = uuid();
       }
@@ -59,10 +69,12 @@ export class UcodeRepository {
     email,
     token,
     forEmailChange = false,
+    consume = false,
   }: {
     email: string;
     token: string;
     forEmailChange?: boolean;
+    consume?: boolean;
   }) {
     const userDetails = await this.userRepository.exist({
       field: 'email',
@@ -109,12 +121,9 @@ export class UcodeRepository {
             },
           });
           if (data) {
-            // delete this token
-            // await prisma.ucode.delete({
-            //   where: {
-            //     id: data.id,
-            //   },
-            // });
+            if (consume) {
+              await this.deleteAllOtpsByUser(data.user_id, email);
+            }
             return true;
           } else {
             return false;
@@ -138,12 +147,30 @@ export class UcodeRepository {
    * delete ucode token
    * @returns
    */
-  async deleteToken({ email, token }) {
+  async deleteToken({ email, token }: { email: string; token: string }) {
     await this.prisma.ucode.deleteMany({
       where: {
         AND: [{ email: email }, { token: token }],
       },
     });
+  }
+
+  async deleteAllOtpsByUser(
+    userId: string | null | undefined,
+    email?: string,
+  ): Promise<void> {
+    if (userId) {
+      await this.prisma.ucode.deleteMany({
+        where: { user_id: userId },
+      });
+      return;
+    }
+
+    if (email) {
+      await this.prisma.ucode.deleteMany({
+        where: { email },
+      });
+    }
   }
 
   async createVerificationToken(params: { userId: string; email: string }) {

@@ -174,6 +174,7 @@ export class AuthService {
 
     return {
       success: true,
+      message: 'User details fetched successfully',
       data: user,
     };
   }
@@ -519,18 +520,13 @@ export class AuthService {
       const existToken = await this.ucodeRepository.validateToken({
         email: email,
         token: token,
+        consume: true,
       });
 
       if (existToken) {
         await this.userRepository.changePassword({
           email: email,
           password: password,
-        });
-
-        // delete otp code
-        await this.ucodeRepository.deleteToken({
-          email: email,
-          token: token,
         });
 
         return {
@@ -581,6 +577,7 @@ export class AuthService {
       const existToken = await this.ucodeRepository.validateToken({
         email: email,
         token: token,
+        consume: true,
       });
 
       if (existToken) {
@@ -590,14 +587,9 @@ export class AuthService {
           },
           data: {
             email_verified_at: new Date(Date.now()),
+            status: UserAccountStatus.ACTIVE,
           },
         });
-
-        // delete otp code
-        // await this.ucodeRepository.deleteToken({
-        //   email: email,
-        //   token: token,
-        // });
 
         return {
           success: true,
@@ -714,18 +706,13 @@ export class AuthService {
         email: email,
         token: token,
         forEmailChange: true,
+        consume: true,
       });
 
       if (existToken) {
         await this.userRepository.changeEmail({
           user_id: user.id,
           new_email: email,
-        });
-
-        // delete otp code
-        await this.ucodeRepository.deleteToken({
-          email: email,
-          token: token,
         });
 
         await this.redis.del(this.getProfileCacheKey(user.id));

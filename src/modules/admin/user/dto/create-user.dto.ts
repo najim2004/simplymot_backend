@@ -13,7 +13,7 @@ import { UserKind } from 'prisma/generated/client';
 export class CreateUserDto {
   @ApiProperty({
     description: 'The email of the user',
-    example: 'john.doe@example.com',
+    example: 'customer@example.com',
   })
   @IsNotEmpty()
   @IsEmail()

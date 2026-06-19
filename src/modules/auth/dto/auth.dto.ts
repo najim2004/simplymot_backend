@@ -33,7 +33,7 @@ export class RegisterUserDto {
   @ApiProperty({
     description:
       'Unique electronic mail address for account verification and login',
-    example: 'john.doe@example.com',
+    example: 'customer@example.com',
     format: 'email',
   })
   @IsNotEmpty()
@@ -166,7 +166,7 @@ export class LoginUserDto {
 export class ForgotPasswordDto {
   @ApiProperty({
     description: 'Email address',
-    example: 'john.doe@example.com',
+    example: 'customer@example.com',
     format: 'email',
   })
   @IsNotEmpty()
@@ -177,7 +177,7 @@ export class ForgotPasswordDto {
 export class VerifyEmailDto {
   @ApiProperty({
     description: 'Email address',
-    example: 'john.doe@example.com',
+    example: 'customer@example.com',
     format: 'email',
   })
   @IsNotEmpty()
@@ -197,7 +197,7 @@ export class VerifyEmailDto {
 export class ResendVerificationEmailDto {
   @ApiProperty({
     description: 'Email address',
-    example: 'john.doe@example.com',
+    example: 'customer@example.com',
     format: 'email',
   })
   @IsNotEmpty()
@@ -208,7 +208,7 @@ export class ResendVerificationEmailDto {
 export class ResetPasswordDto {
   @ApiProperty({
     description: 'Email address',
-    example: 'john.doe@example.com',
+    example: 'customer@example.com',
     format: 'email',
   })
   @IsNotEmpty()
@@ -261,7 +261,7 @@ export class ChangePasswordDto {
 export class RequestEmailChangeDto {
   @ApiProperty({
     description: 'New email address',
-    example: 'john.doe@example.com',
+    example: 'customer@example.com',
     format: 'email',
   })
   @IsNotEmpty()
@@ -272,7 +272,7 @@ export class RequestEmailChangeDto {
 export class ChangeEmailDto {
   @ApiProperty({
     description: 'New email address',
-    example: 'john.doe@example.com',
+    example: 'customer@example.com',
     format: 'email',
   })
   @IsNotEmpty()
@@ -292,7 +292,7 @@ export class ChangeEmailDto {
 export class CheckOTPValidationDto {
   @ApiProperty({
     description: 'Email address',
-    example: 'john.doe@example.com',
+    example: 'customer@example.com',
     format: 'email',
   })
   @IsNotEmpty()

@@ -22,7 +22,7 @@ export class CreateAdminContactDto {
   @IsEmail()
   @ApiProperty({
     description: 'Email',
-    example: 'john.doe@example.com',
+    example: 'customer@example.com',
   })
   email: string;
 
