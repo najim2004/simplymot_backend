@@ -59,7 +59,7 @@ export class NotificationController {
     },
     { type: UnreadCountResponseDto },
   )
-  @Get('unread-count')
+  @Get('unread_count')
   unreadCount(@User('id') user_id: string) {
     return this.notificationService.countUnread(user_id);
   }
@@ -71,9 +71,12 @@ export class NotificationController {
     },
     { type: GetNotificationResponseDto },
   )
-  @Get(':id')
-  findOne(@Param('id') id: string, @User('id') user_id: string) {
-    return this.notificationService.findOne(id, user_id);
+  @Get(':notification_id')
+  findOne(
+    @Param('notification_id') notification_id: string,
+    @User('id') user_id: string,
+  ) {
+    return this.notificationService.findOne(notification_id, user_id);
   }
 
   @apiTypedDoc(
@@ -83,7 +86,7 @@ export class NotificationController {
     },
     { type: MarkNotificationsResponseDto },
   )
-  @Patch('read-all')
+  @Patch('read_all')
   markAllRead(@User('id') user_id: string) {
     return this.notificationService.markAll(user_id);
   }
@@ -95,7 +98,7 @@ export class NotificationController {
     },
     { type: MarkNotificationsResponseDto },
   )
-  @Patch('all/mark')
+  @Patch('all/mark_all')
   markAll(@User('id') user_id: string) {
     return this.notificationService.markAll(user_id);
   }
@@ -107,9 +110,12 @@ export class NotificationController {
     },
     { type: MarkOneNotificationResponseDto },
   )
-  @Patch(':id/read')
-  markOneRead(@Param('id') id: string, @User('id') user_id: string) {
-    return this.notificationService.markOne(id, user_id);
+  @Patch(':notification_id/read')
+  markOneRead(
+    @Param('notification_id') notification_id: string,
+    @User('id') user_id: string,
+  ) {
+    return this.notificationService.markOne(notification_id, user_id);
   }
 
   @apiTypedDoc(
@@ -119,9 +125,12 @@ export class NotificationController {
     },
     { type: MarkOneNotificationResponseDto },
   )
-  @Patch(':id/mark')
-  markOne(@Param('id') id: string, @User('id') user_id: string) {
-    return this.notificationService.markOne(id, user_id);
+  @Patch(':notification_id/mark')
+  markOne(
+    @Param('notification_id') notification_id: string,
+    @User('id') user_id: string,
+  ) {
+    return this.notificationService.markOne(notification_id, user_id);
   }
 
   @apiTypedDoc(
@@ -143,8 +152,11 @@ export class NotificationController {
     },
     { type: DeleteNotificationResponseDto },
   )
-  @Delete(':id')
-  remove(@Param('id') id: string, @User('id') user_id: string) {
-    return this.notificationService.remove(id, user_id);
+  @Delete(':notification_id')
+  remove(
+    @Param('notification_id') notification_id: string,
+    @User('id') user_id: string,
+  ) {
+    return this.notificationService.remove(notification_id, user_id);
   }
 }

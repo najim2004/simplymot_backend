@@ -319,10 +319,7 @@ export class StripeService {
       ? new Date(stripeSubscription.trial_end * 1000)
       : null;
     const daysRemaining = trialEnd
-      ? Math.max(
-          0,
-          Math.ceil((trialEnd.getTime() - Date.now()) / 86_400_000),
-        )
+      ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86_400_000))
       : 0;
 
     const plan = await this.prisma.subscriptionPlan.findUnique({
@@ -492,9 +489,7 @@ export class StripeService {
     return { subscription_id: subscriptionId };
   }
 
-  private subscriptionHintsFromMetadata(
-    metadata?: Stripe.Metadata | null,
-  ) {
+  private subscriptionHintsFromMetadata(metadata?: Stripe.Metadata | null) {
     return {
       subscription_id: metadata?.subscription_id ?? null,
       user_id: metadata?.user_id ?? null,
@@ -518,7 +513,9 @@ export class StripeService {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Failed to create subscription notification: ${message}`);
+      this.logger.warn(
+        `Failed to create subscription notification: ${message}`,
+      );
     }
   }
 
@@ -595,7 +592,10 @@ export class StripeService {
 
   private sumTaxAmounts(invoice: Stripe.Invoice): number {
     const taxes = invoice.total_taxes ?? [];
-    const totalCents = taxes.reduce((sum, entry) => sum + (entry.amount ?? 0), 0);
+    const totalCents = taxes.reduce(
+      (sum, entry) => sum + (entry.amount ?? 0),
+      0,
+    );
     return totalCents / 100;
   }
 
@@ -633,12 +633,18 @@ export class StripeService {
     const item = stripeSubscription.items?.data?.[0];
     const startSeconds =
       item?.current_period_start ??
-      (stripeSubscription as Stripe.Subscription & { current_period_start?: number })
-        .current_period_start;
+      (
+        stripeSubscription as Stripe.Subscription & {
+          current_period_start?: number;
+        }
+      ).current_period_start;
     const endSeconds =
       item?.current_period_end ??
-      (stripeSubscription as Stripe.Subscription & { current_period_end?: number })
-        .current_period_end;
+      (
+        stripeSubscription as Stripe.Subscription & {
+          current_period_end?: number;
+        }
+      ).current_period_end;
 
     if (!startSeconds || !endSeconds) {
       return null;

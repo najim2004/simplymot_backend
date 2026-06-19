@@ -60,9 +60,9 @@ export class VehicleController {
     },
     { type: MotHistoryResponseDto },
   )
-  @Get(':id/mot-history')
+  @Get(':vehicle_id/mot_history')
   getAllMothHistoryOfAVehicle(
-    @Param('id') vehicle_id: string,
+    @Param('vehicle_id') vehicle_id: string,
     @Query() queryMotHistoryDto: QueryMotHistoryDto,
     @User('id') user_id: string,
   ) {
@@ -80,8 +80,11 @@ export class VehicleController {
     },
     { type: DeleteVehicleResponseDto },
   )
-  @Delete(':id')
-  deleteVehicle(@Param('id') vehicle_id: string, @User('id') user_id: string) {
+  @Delete(':vehicle_id')
+  deleteVehicle(
+    @Param('vehicle_id') vehicle_id: string,
+    @User('id') user_id: string,
+  ) {
     return this.vehicleService.deleteVehicle(vehicle_id, user_id);
   }
 }

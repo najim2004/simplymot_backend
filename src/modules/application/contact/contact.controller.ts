@@ -1,6 +1,6 @@
 import { Controller, Post, Body, HttpStatus } from '@nestjs/common';
 import { ContactService } from './contact.service';
-import { CreateContactDto } from './dto/create-contact.dto';
+import { CreatePublicContactDto } from './dto/create-contact.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { apiTypedDoc } from 'src/common/swagger/api-doc';
 import { CreateContactResponseDto } from './dto/swagger/contact-api.dto';
@@ -19,7 +19,7 @@ export class ContactController {
     { type: CreateContactResponseDto, status: HttpStatus.CREATED },
   )
   @Post()
-  async create(@Body() createContactDto: CreateContactDto) {
+  async create(@Body() createContactDto: CreatePublicContactDto) {
     try {
       const contact = await this.contactService.create(createContactDto);
       return contact;

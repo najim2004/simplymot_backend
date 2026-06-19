@@ -18,9 +18,7 @@ import { StripeWebhookResponseDto } from './dto/swagger/stripe-api.dto';
 export class StripeController {
   private readonly logger = new Logger(StripeController.name);
 
-  constructor(
-    private readonly stripeService: StripeService,
-  ) {}
+  constructor(private readonly stripeService: StripeService) {}
 
   @apiTypedDoc(
     {
@@ -51,12 +49,18 @@ export class StripeController {
     try {
       event = await this.stripeService.handleWebhook(payload, signature);
     } catch (error) {
-      this.logger.error(`Webhook signature verification failed: ${error.message}`);
-      throw new BadRequestException(`Webhook verification failed: ${error.message}`);
+      this.logger.error(
+        `Webhook signature verification failed: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Webhook verification failed: ${error.message}`,
+      );
     }
 
     try {
-      this.logger.log(`Processing Stripe webhook event: ${event.type} (${event.id})`);
+      this.logger.log(
+        `Processing Stripe webhook event: ${event.type} (${event.id})`,
+      );
 
       switch (event.type) {
         case 'customer.created':
@@ -108,8 +112,13 @@ export class StripeController {
 
       return { received: true };
     } catch (error) {
-      this.logger.error(`Failed to process Stripe webhook event ${event.type}: ${error.message}`, error.stack);
-      throw new InternalServerErrorException(`Webhook processing error: ${error.message}`);
+      this.logger.error(
+        `Failed to process Stripe webhook event ${event.type}: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        `Webhook processing error: ${error.message}`,
+      );
     }
   }
 }

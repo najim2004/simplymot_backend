@@ -1,4 +1,3 @@
-import { Driver } from './../../../../../old_backend/src/modules/admin/driver/entities/driver.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
@@ -53,7 +52,7 @@ export class RegisterUserDto {
 
   @ApiProperty({
     description: 'Secure account password. Must contain at least 8 characters.',
-    example: 'StrongP@ss123',
+    example: '12345678',
     minLength: 8,
     format: 'password',
     writeOnly: true, // Ensures password isn't displayed in response schemas
@@ -142,6 +141,28 @@ export class RegisterUserDto {
   country?: string;
 }
 
+export class LoginUserDto {
+  @ApiProperty({
+    description: 'Email address',
+    example: 'customer@example.com',
+    format: 'email',
+  })
+  @IsNotEmpty()
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({
+    description: 'Password',
+    example: '12345678',
+    minLength: 8,
+    format: 'password',
+  })
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  password: string;
+}
+
 export class ForgotPasswordDto {
   @ApiProperty({
     description: 'Email address',
@@ -205,7 +226,7 @@ export class ResetPasswordDto {
 
   @ApiProperty({
     description: 'New password',
-    example: 'StrongP@ss123',
+    example: '12345678',
     minLength: 8,
     format: 'password',
   })
@@ -218,7 +239,7 @@ export class ResetPasswordDto {
 export class ChangePasswordDto {
   @ApiProperty({
     description: 'Old password',
-    example: 'StrongP@ss123',
+    example: '12345678',
     minLength: 8,
     format: 'password',
   })
@@ -228,7 +249,7 @@ export class ChangePasswordDto {
 
   @ApiProperty({
     description: 'New password',
-    example: 'StrongP@ss123',
+    example: '12345678',
     minLength: 8,
     format: 'password',
   })

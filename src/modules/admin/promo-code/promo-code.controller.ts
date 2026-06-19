@@ -30,7 +30,7 @@ import {
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('admin/promo-codes')
+@Controller('admin/promo_codes')
 export class PromoCodeController {
   constructor(private readonly promoCodeService: PromoCodeService) {}
 
@@ -86,8 +86,8 @@ export class PromoCodeController {
     },
     { type: DeactivatePromoCodeResponseDto },
   )
-  @Patch(':id/deactivate')
-  deactivate(@Param('id') id: string) {
-    return this.promoCodeService.deactivate(id);
+  @Patch(':promo_code_id/deactivate')
+  deactivate(@Param('promo_code_id') promo_code_id: string) {
+    return this.promoCodeService.deactivate(promo_code_id);
   }
 }

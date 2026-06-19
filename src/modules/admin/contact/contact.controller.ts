@@ -11,8 +11,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ContactService } from './contact.service';
-import { CreateContactDto } from './dto/create-contact.dto';
-import { UpdateContactDto } from './dto/update-contact.dto';
+import { CreateAdminContactDto } from './dto/create-contact.dto';
+import { UpdateAdminContactDto } from './dto/update-contact.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../../common/guard/role/roles.decorator';
@@ -44,7 +44,7 @@ export class ContactController {
     { type: CreateAdminContactResponseDto, status: HttpStatus.CREATED },
   )
   @Post()
-  async create(@Body() createContactDto: CreateContactDto) {
+  async create(@Body() createContactDto: CreateAdminContactDto) {
     try {
       const contact = await this.contactService.create(createContactDto);
       return contact;
@@ -112,7 +112,7 @@ export class ContactController {
   @Patch(':contact_id')
   async update(
     @Param('contact_id') contact_id: string,
-    @Body() updateContactDto: UpdateContactDto,
+    @Body() updateContactDto: UpdateAdminContactDto,
   ) {
     try {
       const contact = await this.contactService.update(

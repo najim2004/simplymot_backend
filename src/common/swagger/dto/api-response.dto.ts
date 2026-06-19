@@ -25,10 +25,8 @@ export class MessageSuccessDto {
   message: string;
 }
 
-export class MessageSuccessWithNullDataDto extends MessageSuccessDto {
-  @ApiPropertyOptional({ nullable: true, example: null })
-  data?: null;
-}
+/** Use when API returns `{ success, message, data: null }`. Do not type `data` as `null` — Swagger cannot resolve it. */
+export class MessageSuccessWithNullDataDto extends MessageSuccessDto {}
 
 export class IdOnlyDto {
   @ApiProperty({ example: 'clxxxxxxxxxxxxxxxxxxxxxxxx' })
@@ -36,6 +34,6 @@ export class IdOnlyDto {
 }
 
 export class MessageSuccessWithIdDto extends MessageSuccessDto {
-  @ApiProperty({ type: IdOnlyDto })
+  @ApiProperty({ type: () => IdOnlyDto })
   data: IdOnlyDto;
 }

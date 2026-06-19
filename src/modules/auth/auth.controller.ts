@@ -9,12 +9,7 @@ import {
   UseInterceptors,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiConsumes,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthService } from './auth.service';
@@ -29,6 +24,7 @@ import {
   ResetPasswordDto,
   VerifyEmailDto,
   CheckOTPValidationDto,
+  LoginUserDto,
 } from './dto/auth.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -81,6 +77,7 @@ export class AuthController {
     },
     { type: LoginResponseDto },
   )
+  @ApiBody({ type: LoginUserDto })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   login(@User('id') id: string, @User('email') email: string) {
@@ -130,7 +127,7 @@ export class AuthController {
     },
     { type: MessageSuccessDto },
   )
-  @Post('forgot-password')
+  @Post('forgot_password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
   }
@@ -142,7 +139,7 @@ export class AuthController {
     },
     { type: MessageSuccessDto },
   )
-  @Post('check-otp')
+  @Post('check_otp')
   checkOTPValidation(@Body() checkOTPValidationDto: CheckOTPValidationDto) {
     return this.authService.checkOTPValidation(checkOTPValidationDto);
   }
@@ -155,7 +152,7 @@ export class AuthController {
     },
     { type: MessageSuccessDto },
   )
-  @Post('verify-email')
+  @Post('verify_email')
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
     return this.authService.verifyEmail(verifyEmailDto);
   }
@@ -167,7 +164,7 @@ export class AuthController {
     },
     { type: MessageSuccessDto },
   )
-  @Post('resend-verification-email')
+  @Post('resend_verification_email')
   async resendVerificationEmail(
     @Body() resendVerificationEmailDto: ResendVerificationEmailDto,
   ) {
@@ -182,7 +179,7 @@ export class AuthController {
     },
     { type: MessageSuccessDto },
   )
-  @Post('reset-password')
+  @Post('reset_password')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
   }
@@ -196,7 +193,7 @@ export class AuthController {
     { type: MessageSuccessDto },
   )
   @UseGuards(JwtAuthGuard)
-  @Post('change-password')
+  @Post('change_password')
   async changePassword(
     @User('id') id: string,
     @Body() changePasswordDto: ChangePasswordDto,
@@ -216,7 +213,7 @@ export class AuthController {
     { type: MessageSuccessDto },
   )
   @UseGuards(JwtAuthGuard)
-  @Post('request-email-change')
+  @Post('request_email_change')
   async requestEmailChange(
     @User('id') id: string,
     @Body() requestEmailChangeDto: RequestEmailChangeDto,
@@ -233,7 +230,7 @@ export class AuthController {
     { type: MessageSuccessDto },
   )
   @UseGuards(JwtAuthGuard)
-  @Post('change-email')
+  @Post('change_email')
   async changeEmail(@Body() changeEmailDto: ChangeEmailDto) {
     return this.authService.changeEmail(changeEmailDto);
   }

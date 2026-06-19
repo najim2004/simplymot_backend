@@ -514,9 +514,11 @@ export class SubscriptionRepository {
       data: {
         status: nextStatus,
         stripe_subscription_id: stripeSubscriptionId,
-        stripe_customer_id: stripeCustomerId ?? localSubscription.stripe_customer_id,
+        stripe_customer_id:
+          stripeCustomerId ?? localSubscription.stripe_customer_id,
         current_period_start:
-          periods.current_period_start ?? localSubscription.current_period_start,
+          periods.current_period_start ??
+          localSubscription.current_period_start,
         current_period_end:
           periods.current_period_end ?? localSubscription.current_period_end,
         next_billing_date:
@@ -695,8 +697,7 @@ export class SubscriptionRepository {
   }
 
   private isGracePeriodExpired(graceStart: Date) {
-    const graceEnd =
-      graceStart.getTime() + this.gracePeriodDays * 86_400_000;
+    const graceEnd = graceStart.getTime() + this.gracePeriodDays * 86_400_000;
     return Date.now() > graceEnd;
   }
 

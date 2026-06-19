@@ -8,4 +8,3 @@ import { SubscriptionController } from './subscription.controller';
   exports: [SubscriptionService],
 })
 export class SubscriptionModule {}
-

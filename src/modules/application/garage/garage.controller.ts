@@ -61,8 +61,7 @@ export class GarageController {
   @apiTypedDoc(
     {
       summary: 'Get my garage',
-      description:
-        'GARAGE role + JWT. Returns owned garage profile summary.',
+      description: 'GARAGE role + JWT. Returns owned garage profile summary.',
     },
     { type: GetGarageResponseDto },
   )

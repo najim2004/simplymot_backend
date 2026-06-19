@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { CreateContactDto } from './dto/create-contact.dto';
+import { CreatePublicContactDto } from './dto/create-contact.dto';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class ContactService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createContactDto: CreateContactDto) {
+  async create(createContactDto: CreatePublicContactDto) {
     try {
       const data = {};
       if (createContactDto.first_name) {

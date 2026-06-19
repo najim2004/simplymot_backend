@@ -440,15 +440,16 @@ export class SubscriptionService {
     const stripeSubscription =
       await StripePayment.retrieveSubscription(stripeSubscriptionId);
 
-    const subscription = await this.subscriptionRepository.applyStripeSubscriptionToLocalRecord(
-      stripeSubscription,
-      {
-        subscription_id: session.metadata?.subscription_id,
-        user_id: session.metadata?.user_id,
-        plan_id: session.metadata?.plan_id,
-        stripe_promotion_code_id: session.metadata?.stripe_promotion_code_id,
-      },
-    );
+    const subscription =
+      await this.subscriptionRepository.applyStripeSubscriptionToLocalRecord(
+        stripeSubscription,
+        {
+          subscription_id: session.metadata?.subscription_id,
+          user_id: session.metadata?.user_id,
+          plan_id: session.metadata?.plan_id,
+          stripe_promotion_code_id: session.metadata?.stripe_promotion_code_id,
+        },
+      );
 
     return ResponseHelper.success({
       message: 'Subscription checkout validated successfully',
@@ -458,8 +459,6 @@ export class SubscriptionService {
       },
     });
   }
-
-
 
   private async ensureGarageUser(user_id: string) {
     const user = await this.prisma.user.findFirst({
@@ -650,8 +649,6 @@ export class SubscriptionService {
     } satisfies Prisma.SubscriptionInclude;
   }
 
-
-
   private formatSubscription(subscription: SubscriptionWithPlan) {
     const trial = this.getTrialInformation(subscription);
     const cancellation = this.getCancellationInformation(subscription);
@@ -819,8 +816,6 @@ export class SubscriptionService {
       : session.subscription.id;
   }
 
-
-
   private extractStripePeriods(stripeSubscription: Stripe.Subscription) {
     const sub = stripeSubscription as any;
     const start = sub.current_period_start;
@@ -831,6 +826,4 @@ export class SubscriptionService {
       current_period_end: end ? new Date(end * 1000) : null,
     };
   }
-
-
 }

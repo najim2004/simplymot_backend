@@ -34,8 +34,11 @@ export class InvoiceController {
     },
     { type: GetInvoiceResponseDto },
   )
-  @Get(':id')
-  getOneInvoice(@Param('id') id: string, @User('id') user_id: string) {
-    return this.invoiceService.getOneInvoice(id, user_id);
+  @Get(':invoice_id')
+  getOneInvoice(
+    @Param('invoice_id') invoice_id: string,
+    @User('id') user_id: string,
+  ) {
+    return this.invoiceService.getOneInvoice(invoice_id, user_id);
   }
 }

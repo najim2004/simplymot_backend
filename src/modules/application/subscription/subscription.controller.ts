@@ -33,7 +33,8 @@ export class SubscriptionController {
   @apiTypedDoc(
     {
       summary: 'List active plans',
-      description: 'GARAGE + JWT. Each plan may include `current_subscription`.',
+      description:
+        'GARAGE + JWT. Each plan may include `current_subscription`.',
     },
     { type: ListSubscriptionPlansResponseDto },
   )

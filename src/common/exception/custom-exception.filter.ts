@@ -59,7 +59,7 @@ export class CustomExceptionFilter implements ExceptionFilter {
     response.status(status).json(
       ResponseHelper.error({
         message,
-        data: details,
+        // data: details,
         meta_data: {
           timestamp: new Date().toISOString(),
           path: request.url,

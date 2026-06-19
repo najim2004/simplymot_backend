@@ -8,4 +8,3 @@ import { StripeController } from './stripe.controller';
   providers: [StripeService],
 })
 export class StripeModule {}
-

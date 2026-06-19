@@ -164,13 +164,26 @@ export class DeleteUserResponseDto {
   @ApiProperty()
   message: string;
 
-  @ApiProperty({ type: AdminUserDeletedDto })
+  @ApiProperty({ type: () => AdminUserDeletedDto })
   data: AdminUserDeletedDto;
 }
 
-export {
-  MessageSuccessWithNullDataDto as ApproveUserResponseDto,
-  MessageSuccessWithNullDataDto as RejectUserResponseDto,
-  MessageSuccessWithNullDataDto as UnbanUserResponseDto,
-  MessageSuccessWithNullDataDto as UpdateUserResponseDto,
-};
+export class ApproveUserResponseDto extends MessageSuccessWithNullDataDto {
+  @ApiProperty({ example: 'User approved successfully' })
+  message: string;
+}
+
+export class RejectUserResponseDto extends MessageSuccessWithNullDataDto {
+  @ApiProperty({ example: 'User rejected successfully' })
+  message: string;
+}
+
+export class UnbanUserResponseDto extends MessageSuccessWithNullDataDto {
+  @ApiProperty({ example: 'User unbanned successfully' })
+  message: string;
+}
+
+export class UpdateUserResponseDto extends MessageSuccessWithNullDataDto {
+  @ApiProperty({ example: 'User updated successfully' })
+  message: string;
+}

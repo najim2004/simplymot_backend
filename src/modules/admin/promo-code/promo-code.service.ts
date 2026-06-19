@@ -228,7 +228,9 @@ export class PromoCodeService {
   }
 
   async markRedeemedByStripePromotionCode(promotionCodeId?: string | null) {
-    return this.promoCodeRepository.markRedeemedByStripePromotionCode(promotionCodeId);
+    return this.promoCodeRepository.markRedeemedByStripePromotionCode(
+      promotionCodeId,
+    );
   }
 
   private formatPromo(promo: Prisma.PromoCodeGetPayload<object>) {

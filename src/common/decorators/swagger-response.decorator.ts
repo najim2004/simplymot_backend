@@ -1,5 +1,9 @@
 import { applyDecorators, HttpStatus, Type } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, getSchemaPath } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  getSchemaPath,
+} from '@nestjs/swagger';
 
 export type ApiSuccessResponseOptions = {
   message?: string;
@@ -50,9 +54,7 @@ export function ApiSuccessEnvelope<T extends Type<unknown>>(
   } = {},
 ) {
   const responseDecorator =
-    options.status === HttpStatus.CREATED
-      ? ApiCreatedResponse
-      : ApiOkResponse;
+    options.status === HttpStatus.CREATED ? ApiCreatedResponse : ApiOkResponse;
 
   const dataSchema = options.isArray
     ? { type: 'array', items: { $ref: getSchemaPath(dataType) } }

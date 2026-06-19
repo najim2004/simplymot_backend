@@ -30,5 +30,8 @@ export function apiTypedDoc(
 ) {
   const decorator =
     response.status === HttpStatus.CREATED ? ApiCreatedResponse : ApiOkResponse;
-  return applyDecorators(ApiOperation(operation), decorator({ type: response.type }));
+  return applyDecorators(
+    ApiOperation(operation),
+    decorator({ type: response.type }),
+  );
 }
