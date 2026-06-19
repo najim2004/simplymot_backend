@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaginationMetaDto } from 'src/common/swagger/dto/api-response.dto';
 
 /** Permission row as returned by the API (matches DB + CASL subject/action). */
 export class PermissionRecordDto {
@@ -13,20 +14,6 @@ export class PermissionRecordDto {
 
   @ApiPropertyOptional({ example: 'User', nullable: true })
   subject: string | null;
-}
-
-export class PaginationMetaDto {
-  @ApiProperty({ example: 1, minimum: 1 })
-  page: number;
-
-  @ApiProperty({ example: 20, minimum: 1 })
-  limit: number;
-
-  @ApiProperty({ example: 100 })
-  total: number;
-
-  @ApiProperty({ example: 5 })
-  pages: number;
 }
 
 export class RoleListItemDto {

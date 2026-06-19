@@ -1,5 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserAccountStatus, UserKind } from 'prisma/generated/enums';
+import { MessageSuccessDto } from 'src/common/swagger/dto/api-response.dto';
+
+export { MessageSuccessDto };
 
 export class MeSubscriptionSummaryDto {
   @ApiProperty()
@@ -41,6 +44,40 @@ export class MeGarageSummaryDto {
   phone_number: string | null;
 }
 
+export class MeRolePermissionDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  title: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  action: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  subject: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  conditions: Record<string, unknown> | null;
+
+  @ApiPropertyOptional({ type: [String], nullable: true })
+  fields: string[] | null;
+}
+
+export class MeRoleDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  title: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  name: string | null;
+
+  @ApiProperty({ type: [MeRolePermissionDto] })
+  permissions: MeRolePermissionDto[];
+}
+
 export class AuthMeUserDto {
   @ApiProperty()
   id: string;
@@ -80,6 +117,12 @@ export class AuthMeUserDto {
 
   @ApiProperty({ enum: UserAccountStatus })
   status: UserAccountStatus;
+
+  @ApiPropertyOptional({
+    type: [MeRoleDto],
+    description: 'Present for ADMIN users',
+  })
+  roles?: MeRoleDto[];
 
   @ApiPropertyOptional({
     type: MeSubscriptionSummaryDto,
@@ -149,12 +192,4 @@ export class LoginResponseDto {
 
   @ApiProperty({ type: LoginUserDto })
   user: LoginUserDto;
-}
-
-export class MessageSuccessDto {
-  @ApiProperty({ example: true })
-  success: boolean;
-
-  @ApiProperty({ example: 'Operation completed' })
-  message: string;
 }

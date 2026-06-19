@@ -13,43 +13,25 @@ import {
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '../../../common/guard/role/role.enum';
 import { Roles } from '../../../common/guard/role/roles.decorator';
 import { RolesGuard } from '../../../common/guard/role/roles.guard';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { User } from '../../auth/decorators/get-user.decorator';
 import { QueryUserDto } from './dto/query-user.dto';
-import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
-
-const USER_LIST_ITEM = {
-  id: 'cluser001',
-  name: 'John Driver',
-  email: 'john@example.com',
-  avatar: null,
-  avatar_url: null,
-  phone_number: '+441112223333',
-  kind: 'DRIVER',
-  email_verified_at: '2026-01-15T00:00:00.000Z',
-  approved_at: '2026-01-16T00:00:00.000Z',
-  created_at: '2026-01-10T00:00:00.000Z',
-  status: 'ACTIVE',
-};
-
-const USER_LIST_META = { total: 50, page: 1, limit: 10, pages: 5 };
-
-const USER_CREATED = {
-  id: 'cluser002',
-  email: 'garage@example.com',
-  name: 'Garage Owner',
-  kind: 'GARAGE',
-  phone_number: '+441234567890',
-  email_verified_at: null,
-  approved_at: null,
-  billing_id: null,
-  created_at: '2026-06-14T10:00:00.000Z',
-  roles: [],
-};
+import { apiTypedDoc } from 'src/common/swagger/api-doc';
+import {
+  ApproveUserResponseDto,
+  BanUserResponseDto,
+  CreateUserResponseDto,
+  DeleteUserResponseDto,
+  GetUserResponseDto,
+  ListUsersResponseDto,
+  RejectUserResponseDto,
+  UnbanUserResponseDto,
+  UpdateUserResponseDto,
+} from './dto/swagger/user-api.dto';
 
 @ApiBearerAuth()
 @ApiTags('Admin Users')
@@ -59,15 +41,13 @@ const USER_CREATED = {
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @ApiOperation({
-    summary: 'Create user',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'User created successfully',
-    status: HttpStatus.CREATED,
-    data: USER_CREATED,
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Create user',
+      description: 'ADMIN + JWT.',
+    },
+    { type: CreateUserResponseDto, status: HttpStatus.CREATED },
+  )
   @Post()
   createUser(
     @Body() createUserDto: CreateUserDto,
@@ -76,93 +56,85 @@ export class UserController {
     return this.userService.createUser(createUserDto, currentUserId);
   }
 
-  @ApiOperation({
-    summary: 'List users',
-    description: 'ADMIN + JWT. Paginated with filters.',
-  })
-  @ApiSuccessResponse({
-    message: 'Users fetched successfully',
-    data: [USER_LIST_ITEM],
-    metaData: USER_LIST_META,
-  })
+  @apiTypedDoc(
+    {
+      summary: 'List users',
+      description: 'ADMIN + JWT. Paginated with filters.',
+    },
+    { type: ListUsersResponseDto },
+  )
   @Get()
   findAllUsers(@Query() queryUserDto: QueryUserDto) {
     return this.userService.findAllUsers(queryUserDto);
   }
 
-  @ApiOperation({
-    summary: 'Approve user',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'User approved successfully',
-    data: null,
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Approve user',
+      description: 'ADMIN + JWT.',
+    },
+    { type: ApproveUserResponseDto },
+  )
   @Post(':user_id/approve')
   approveUser(@Param('user_id') user_id: string) {
     return this.userService.approveUser(user_id);
   }
 
-  @ApiOperation({
-    summary: 'Reject user',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'User rejected successfully',
-    data: null,
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Reject user',
+      description: 'ADMIN + JWT.',
+    },
+    { type: RejectUserResponseDto },
+  )
   @Post(':user_id/reject')
   rejectUser(@Param('user_id') user_id: string) {
     return this.userService.rejectUser(user_id);
   }
 
-  @ApiOperation({
-    summary: 'Ban user',
-    description: 'ADMIN + JWT. Cancels garage subscriptions.',
-  })
-  @ApiSuccessResponse({
-    message: 'User banned successfully',
-    data: { cancelled_subscriptions: 1 },
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Ban user',
+      description: 'ADMIN + JWT. Cancels garage subscriptions.',
+    },
+    { type: BanUserResponseDto },
+  )
   @Post(':user_id/ban')
   banUser(@Param('user_id') user_id: string) {
     return this.userService.banUser(user_id);
   }
 
-  @ApiOperation({
-    summary: 'Unban user',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'User unbanned successfully',
-    data: null,
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Unban user',
+      description: 'ADMIN + JWT.',
+    },
+    { type: UnbanUserResponseDto },
+  )
   @Post(':user_id/unban')
   unbanUser(@Param('user_id') user_id: string) {
     return this.userService.unbanUser(user_id);
   }
 
-  @ApiOperation({
-    summary: 'Get user',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'User fetched successfully',
-    data: USER_LIST_ITEM,
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Get user',
+      description: 'ADMIN + JWT.',
+    },
+    { type: GetUserResponseDto },
+  )
   @Get(':user_id')
   findOneUser(@Param('user_id') user_id: string) {
     return this.userService.findOneUser(user_id);
   }
 
-  @ApiOperation({
-    summary: 'Update user',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'User updated successfully',
-    data: null,
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Update user',
+      description: 'ADMIN + JWT.',
+    },
+    { type: UpdateUserResponseDto },
+  )
   @Patch(':user_id')
   updateUser(
     @Param('user_id') user_id: string,
@@ -171,22 +143,13 @@ export class UserController {
     return this.userService.updateUser(user_id, updateUserDto);
   }
 
-  @ApiOperation({
-    summary: 'Delete user',
-    description: 'ADMIN + JWT. Soft delete.',
-  })
-  @ApiSuccessResponse({
-    message: 'User deleted successfully',
-    data: {
-      user_id: 'cluser001',
-      email: 'john@example.com',
-      name: 'John Driver',
-      kind: 'DRIVER',
-      deleted_at: '2026-06-14T10:00:00.000Z',
-      deleted_records: { vehicles: 2, services: 0, subscriptions: 0 },
-      stripe_customer_id: null,
+  @apiTypedDoc(
+    {
+      summary: 'Delete user',
+      description: 'ADMIN + JWT. Soft delete.',
     },
-  })
+    { type: DeleteUserResponseDto },
+  )
   @Delete(':user_id')
   deleteUser(@Param('user_id') user_id: string) {
     return this.userService.deleteUser(user_id);

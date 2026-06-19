@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -12,6 +12,16 @@ import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { SubscriptionModule } from '../application/subscription/subscription.module';
+
+const googleOAuthEnabled =
+  Boolean(process.env.GOOGLE_APP_ID?.trim()) &&
+  Boolean(process.env.GOOGLE_APP_SECRET?.trim());
+
+if (!googleOAuthEnabled) {
+  new Logger('AuthModule').log(
+    'Google OAuth disabled — set GOOGLE_APP_ID and GOOGLE_APP_SECRET to enable',
+  );
+}
 
 @Module({
   imports: [
@@ -35,7 +45,7 @@ import { SubscriptionModule } from '../application/subscription/subscription.mod
     AuthService,
     LocalStrategy,
     JwtStrategy,
-    GoogleStrategy,
+    ...(googleOAuthEnabled ? [GoogleStrategy] : []),
     JwtAuthGuard,
     OptionalJwtAuthGuard,
   ],

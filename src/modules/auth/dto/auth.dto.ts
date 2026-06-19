@@ -1,3 +1,4 @@
+import { Driver } from './../../../../../old_backend/src/modules/admin/driver/entities/driver.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
@@ -15,7 +16,7 @@ export class RegisterUserDto {
   @ApiProperty({
     description: 'The category of user account being created',
     enum: UserKind,
-    example: UserKind.USER,
+    example: UserKind.DRIVER,
   })
   @IsNotEmpty()
   @IsEnum(UserKind, { message: 'kind must be a valid UserKind enum value' })

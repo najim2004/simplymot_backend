@@ -12,15 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiCreatedResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiParam,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guard/role/roles.guard';
 import { AbilitiesGuard } from '../../../ability/abilities.guard';
@@ -42,6 +34,7 @@ import {
   SetRolePermissionsResponseDto,
   UpdateRoleResponseDto,
 } from './dto/swagger/role-api.dto';
+import { apiTypedDoc } from 'src/common/swagger/api-doc';
 
 @ApiTags('Admin Roles')
 @Controller('admin/roles')
@@ -51,12 +44,6 @@ import {
 export class RoleController {
   constructor(private readonly roleService: RoleService) {}
 
-  @Get()
-  @ApiOperation({
-    summary: 'Paginated list of roles',
-    description:
-      'Returns non-deleted roles with permission counts. Use for admin tables.',
-  })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -69,7 +56,15 @@ export class RoleController {
     example: 20,
     description: 'Page size',
   })
-  @ApiOkResponse({ type: ListRolesResponseDto })
+  @apiTypedDoc(
+    {
+      summary: 'Paginated list of roles',
+      description:
+        'Returns non-deleted roles with permission counts. Use for admin tables.',
+    },
+    { type: ListRolesResponseDto },
+  )
+  @Get()
   @CheckAbilities({ action: Action.Read, subject: 'Role' })
   async listRoles(
     @Query('page') page: string = '1',
@@ -83,40 +78,46 @@ export class RoleController {
     return this.roleService.listRoles(p, l);
   }
 
+  @apiTypedDoc(
+    {
+      summary: 'List permissions (alias)',
+      description:
+        'Same payload as `GET /admin/permissions`. Kept for backward compatibility.',
+    },
+    { type: ListPermissionsResponseDto },
+  )
   @Get('permissions')
-  @ApiOperation({
-    summary: 'List permissions (alias)',
-    description:
-      'Same payload as `GET /admin/permissions`. Kept for backward compatibility.',
-  })
-  @ApiOkResponse({ type: ListPermissionsResponseDto })
   @CheckAbilities({ action: Action.Read, subject: 'Role' })
   async listPermissions(): Promise<ListPermissionsResponseDto> {
     return this.roleService.listPermissions();
   }
 
+  @apiTypedDoc(
+    {
+      summary: 'Role & permission usage statistics',
+      description:
+        'Aggregates role counts, user counts, and per-role assignment stats.',
+    },
+    { type: RoleStatisticsResponseDto },
+  )
   @Get('statistics')
-  @ApiOperation({
-    summary: 'Role & permission usage statistics',
-    description:
-      'Aggregates role counts, user counts, and per-role assignment stats.',
-  })
-  @ApiOkResponse({ type: RoleStatisticsResponseDto })
   @CheckAbilities({ action: Action.Read, subject: 'Role' })
   async getRoleStatistics(): Promise<RoleStatisticsResponseDto> {
     return this.roleService.getRoleStatistics();
   }
 
-  @Get(':role_id')
-  @ApiOperation({
-    summary: 'Get one role with permissions',
-  })
   @ApiParam({
     name: 'role_id',
     description: 'Role id (cuid)',
     example: 'clxxxxxxxxxxxxxxxxxxxxxxxx',
   })
-  @ApiOkResponse({ type: RoleDetailResponseDto })
+  @apiTypedDoc(
+    {
+      summary: 'Get one role with permissions',
+    },
+    { type: RoleDetailResponseDto },
+  )
+  @Get(':role_id')
   @CheckAbilities({ action: Action.Show, subject: 'Role' })
   async getRole(
     @Param('role_id') role_id: string,
@@ -124,19 +125,23 @@ export class RoleController {
     return this.roleService.getRole(role_id);
   }
 
+  @apiTypedDoc(
+    { summary: 'Create a custom role' },
+    { type: CreateRoleResponseDto, status: HttpStatus.CREATED },
+  )
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a custom role' })
-  @ApiCreatedResponse({ type: CreateRoleResponseDto })
   @CheckAbilities({ action: Action.Create, subject: 'Role' })
   async createRole(@Body() dto: CreateRoleDto): Promise<CreateRoleResponseDto> {
     return this.roleService.createRole(dto);
   }
 
-  @Put(':role_id')
-  @ApiOperation({ summary: 'Update role title or slug' })
   @ApiParam({ name: 'role_id', description: 'Role id (cuid)' })
-  @ApiOkResponse({ type: UpdateRoleResponseDto })
+  @apiTypedDoc(
+    { summary: 'Update role title or slug' },
+    { type: UpdateRoleResponseDto },
+  )
+  @Put(':role_id')
   @CheckAbilities({ action: Action.Update, subject: 'Role' })
   async updateRole(
     @Param('role_id') role_id: string,
@@ -145,14 +150,16 @@ export class RoleController {
     return this.roleService.updateRole(role_id, dto);
   }
 
-  @Delete(':role_id')
-  @ApiOperation({
-    summary: 'Soft-delete a role',
-    description:
-      'Fails if the role is assigned to users or is a protected system role.',
-  })
   @ApiParam({ name: 'role_id', description: 'Role id (cuid)' })
-  @ApiOkResponse({ type: DeleteRoleResponseDto })
+  @apiTypedDoc(
+    {
+      summary: 'Soft-delete a role',
+      description:
+        'Fails if the role is assigned to users or is a protected system role.',
+    },
+    { type: DeleteRoleResponseDto },
+  )
+  @Delete(':role_id')
   @CheckAbilities({ action: Action.Delete, subject: 'Role' })
   async deleteRole(
     @Param('role_id') role_id: string,
@@ -160,14 +167,16 @@ export class RoleController {
     return this.roleService.deleteRole(role_id);
   }
 
-  @Post(':role_id/permissions')
-  @ApiOperation({
-    summary: 'Assign, replace, or remove permissions on a role',
-    description:
-      'System tenant permissions can only be linked to the `su_admin` role.',
-  })
   @ApiParam({ name: 'role_id', description: 'Role id (cuid)' })
-  @ApiOkResponse({ type: SetRolePermissionsResponseDto })
+  @apiTypedDoc(
+    {
+      summary: 'Assign, replace, or remove permissions on a role',
+      description:
+        'System tenant permissions can only be linked to the `su_admin` role.',
+    },
+    { type: SetRolePermissionsResponseDto },
+  )
+  @Post(':role_id/permissions')
   @CheckAbilities({ action: Action.Update, subject: 'Role' })
   async setRolePermissions(
     @Param('role_id') role_id: string,

@@ -9,7 +9,9 @@ import {
 } from '@nestjs/common';
 import { StripeService } from './stripe.service';
 import { Request } from 'express';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
+import { apiTypedDoc } from 'src/common/swagger/api-doc';
+import { StripeWebhookResponseDto } from './dto/swagger/stripe-api.dto';
 
 @ApiTags('Stripe')
 @Controller('payment/stripe')
@@ -20,19 +22,17 @@ export class StripeController {
     private readonly stripeService: StripeService,
   ) {}
 
-  @ApiOperation({
-    summary: 'Handle Stripe webhook events',
-    description: [
-      'Subscription: checkout.session.*, customer.subscription.*',
-      'Billing: invoice.payment_succeeded, invoice.payment_failed, invoice.payment_action_required',
-      'Payments: payment_intent.*, charge.refunded',
-    ].join(' '),
-  })
-  @ApiOkResponse({
-    schema: {
-      example: { received: true },
+  @apiTypedDoc(
+    {
+      summary: 'Handle Stripe webhook events',
+      description: [
+        'Subscription: checkout.session.*, customer.subscription.*',
+        'Billing: invoice.payment_succeeded, invoice.payment_failed, invoice.payment_action_required',
+        'Payments: payment_intent.*, charge.refunded',
+      ].join(' '),
     },
-  })
+    { type: StripeWebhookResponseDto },
+  )
   @Post('webhook')
   async handleWebhook(
     @Headers('stripe-signature') signature: string,

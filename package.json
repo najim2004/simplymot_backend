@@ -9,6 +9,7 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
+    "dev": "nest start --watch",
     "start:dev": "nest start --watch",
     "start:dev-swc": "nest start -b swc -w",
     "start:debug": "nest start --debug --watch",
@@ -19,7 +20,10 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "cmd": "cross-env PRISMA_ENV=1 ts-node src/cmd.ts"
+    "cmd": "cross-env PRISMA_ENV=1 ts-node src/cmd.ts",
+    "db:gen": "npx prisma generate",
+    "db:mig": "npx prisma migrate deploy",
+    "db:std": "npx prisma studio"
   },
   "dependencies": {
     "@casl/ability": "6.7.3",

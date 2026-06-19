@@ -1,7 +1,7 @@
 import { applyDecorators, HttpStatus, Type } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, getSchemaPath } from '@nestjs/swagger';
 
-type ApiSuccessResponseOptions = {
+export type ApiSuccessResponseOptions = {
   message?: string;
   status?: HttpStatus.OK | HttpStatus.CREATED;
   data?: Record<string, unknown> | unknown[];

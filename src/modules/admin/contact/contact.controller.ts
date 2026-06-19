@@ -13,22 +13,19 @@ import {
 import { ContactService } from './contact.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../../common/guard/role/roles.decorator';
 import { Role } from '../../../common/guard/role/role.enum';
 import { RolesGuard } from '../../../common/guard/role/roles.guard';
-import { ApiSuccessResponse } from 'src/common/decorators/swagger-response.decorator';
-const CONTACT_EXAMPLE = {
-  id: 'clcontact001',
-  name: 'John Driver',
-  email: 'john@example.com',
-  subject: 'Support request',
-  message: 'I need help with my booking',
-  status: 1,
-  created_at: '2026-06-14T10:00:00.000Z',
-  updated_at: '2026-06-14T10:00:00.000Z',
-};
+import { apiTypedDoc } from 'src/common/swagger/api-doc';
+import {
+  CreateAdminContactResponseDto,
+  DeleteAdminContactResponseDto,
+  GetAdminContactResponseDto,
+  ListAdminContactsResponseDto,
+  UpdateAdminContactResponseDto,
+} from './dto/swagger/contact-api.dto';
 
 @ApiBearerAuth()
 @ApiTags('Admin Contacts')
@@ -38,15 +35,14 @@ const CONTACT_EXAMPLE = {
 export class ContactController {
   constructor(private readonly contactService: ContactService) {}
 
-  @ApiOperation({
-    summary: 'Create contact',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'Contact created successfully',
-    status: HttpStatus.CREATED,
-    data: CONTACT_EXAMPLE,
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Create contact',
+      description:
+        'ADMIN + JWT. Body: `first_name`, `last_name`, `email`, `phone_number`, `message`.',
+    },
+    { type: CreateAdminContactResponseDto, status: HttpStatus.CREATED },
+  )
   @Post()
   async create(@Body() createContactDto: CreateContactDto) {
     try {
@@ -60,14 +56,13 @@ export class ContactController {
     }
   }
 
-  @ApiOperation({
-    summary: 'List contacts',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'Contacts fetched successfully',
-    data: [CONTACT_EXAMPLE],
-  })
+  @apiTypedDoc(
+    {
+      summary: 'List contacts',
+      description: 'ADMIN + JWT.',
+    },
+    { type: ListAdminContactsResponseDto },
+  )
   @Get()
   async findAll(@Query() query: { q?: string; status?: number }) {
     try {
@@ -87,14 +82,13 @@ export class ContactController {
     }
   }
 
-  @ApiOperation({
-    summary: 'Get contact',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'Contact fetched successfully',
-    data: CONTACT_EXAMPLE,
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Get contact',
+      description: 'ADMIN + JWT.',
+    },
+    { type: GetAdminContactResponseDto },
+  )
   @Get(':contact_id')
   async findOne(@Param('contact_id') contact_id: string) {
     try {
@@ -108,14 +102,13 @@ export class ContactController {
     }
   }
 
-  @ApiOperation({
-    summary: 'Update contact',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'Contact updated successfully',
-    data: CONTACT_EXAMPLE,
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Update contact',
+      description: 'ADMIN + JWT.',
+    },
+    { type: UpdateAdminContactResponseDto },
+  )
   @Patch(':contact_id')
   async update(
     @Param('contact_id') contact_id: string,
@@ -135,14 +128,13 @@ export class ContactController {
     }
   }
 
-  @ApiOperation({
-    summary: 'Delete contact',
-    description: 'ADMIN + JWT.',
-  })
-  @ApiSuccessResponse({
-    message: 'Contact deleted successfully',
-    data: { id: 'clcontact001' },
-  })
+  @apiTypedDoc(
+    {
+      summary: 'Delete contact',
+      description: 'ADMIN + JWT.',
+    },
+    { type: DeleteAdminContactResponseDto },
+  )
   @Delete(':contact_id')
   async remove(@Param('contact_id') contact_id: string) {
     try {
