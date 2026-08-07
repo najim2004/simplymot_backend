@@ -45,6 +45,30 @@ export class VehicleDto {
   year_of_manufacture: number | null;
 
   @ApiPropertyOptional({ nullable: true })
+  tax_status: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  tax_due_date: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  revenue_weight: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  wheelplan: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  type_approval: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  month_of_first_reg: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  date_of_last_v5c_issued: Date | null;
+
+  @ApiPropertyOptional()
+  marked_for_export: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
   user_id?: string | null;
 }
 

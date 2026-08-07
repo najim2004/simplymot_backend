@@ -500,18 +500,29 @@ model Vehicle {
   year_of_manufacture   Int?
 
   user_id             String?
-  registration_number String  @unique
+  registration_number String    @unique
   make                String?
   model               String?
   color               String?
   fuel_type           String?
   engine_capacity     Int?
   co2_emissions       Int?
-  mot_status          String? // PASSED, FAILED, EXPIRED (derived or from DVSA)
-  is_expired          Boolean @default(false)
+  mot_status          String?   // PASSED, FAILED, EXPIRED (derived or from DVSA)
+  is_expired          Boolean   @default(false)
+
+  // Tax & DVLA Compliance
+  tax_status              String?   // e.g. Taxed
+  tax_due_date            DateTime? // e.g. 2027-05-01
+  revenue_weight          Int?      // e.g. 2020
+  wheelplan               String?   // e.g. 2 AXLE RIGID BODY
+  type_approval           String?   // e.g. M1
+  month_of_first_reg      String?   // e.g. 2013-01
+  date_of_last_v5c_issued DateTime?
+  marked_for_export       Boolean   @default(false)
+
   raw_mot_data        Json?
   raw_dvla_data       Json?
-  raw_mot_status      String? // PASSED, FAILED, EXPIRED (derived or from DVSA)
+  raw_mot_status      String?   // PASSED, FAILED, EXPIRED (derived or from DVSA)
 
   mot_history MotHistory[]
   user        User?        @relation(fields: [user_id], references: [id], onDelete: SetNull)

@@ -24,30 +24,54 @@ export class VehicleRepository {
       ? parseInt(combinedData.motData.engineSize, 10)
       : null;
 
+    const dvla = combinedData?.dvlaData;
+    const rawDvla = (combinedData?.dvlaData as any) || {};
+
     const updatedVehicle = await this.prisma.vehicle.update({
       where: {
         id: vehicle.id,
       },
       data: {
         mot_last_checked_at: new Date(),
-        mot_expiry_date: combinedData?.dvlaData?.motExpiryDate
-          ? new Date(combinedData.dvlaData.motExpiryDate)
+        mot_expiry_date: dvla?.motExpiryDate
+          ? new Date(dvla.motExpiryDate)
           : vehicle.mot_expiry_date,
-        make: combinedData?.dvlaData?.make ?? vehicle.make,
+        make: dvla?.make ?? vehicle.make,
         model: combinedData?.motData?.model ?? vehicle.model,
-        color: combinedData?.dvlaData?.colour ?? vehicle.color,
+        color: dvla?.colour ?? vehicle.color,
         fuel_type:
-          combinedData?.dvlaData?.fuelType ??
+          dvla?.fuelType ??
           combinedData?.motData?.fuelType ??
           vehicle.fuel_type,
         engine_capacity:
-          combinedData?.dvlaData?.engineCapacity ??
+          dvla?.engineCapacity ??
           (Number.isNaN(motEngineSize)
             ? vehicle.engine_capacity
             : motEngineSize),
-        co2_emissions:
-          combinedData?.dvlaData?.co2Emissions ?? vehicle.co2_emissions,
-        mot_status: combinedData?.dvlaData?.motStatus ?? vehicle.mot_status,
+        co2_emissions: dvla?.co2Emissions ?? vehicle.co2_emissions,
+        mot_status: dvla?.motStatus ?? vehicle.mot_status,
+        year_of_manufacture:
+          dvla?.yearOfManufacture ?? vehicle.year_of_manufacture,
+
+        // DVLA Compliance & Technical Specs
+        tax_status: dvla?.taxStatus ?? vehicle.tax_status,
+        tax_due_date: dvla?.taxDueDate
+          ? new Date(dvla.taxDueDate)
+          : vehicle.tax_due_date,
+        revenue_weight:
+          rawDvla?.revenueWeight ??
+          rawDvla?.revenue_weight ??
+          vehicle.revenue_weight,
+        wheelplan: dvla?.wheelplan ?? vehicle.wheelplan,
+        type_approval: dvla?.typeApproval ?? vehicle.type_approval,
+        month_of_first_reg:
+          dvla?.monthOfFirstRegistration ?? vehicle.month_of_first_reg,
+        date_of_last_v5c_issued: dvla?.dateOfLastV5CIssued
+          ? new Date(dvla.dateOfLastV5CIssued)
+          : vehicle.date_of_last_v5c_issued,
+        marked_for_export:
+          dvla?.markedForExport ?? vehicle.marked_for_export ?? false,
+
         raw_mot_data: (combinedData?.motData as any) ?? vehicle.raw_mot_data,
         raw_dvla_data: (combinedData?.dvlaData as any) ?? vehicle.raw_dvla_data,
       },
