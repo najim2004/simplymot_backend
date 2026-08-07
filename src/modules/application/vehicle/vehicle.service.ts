@@ -37,39 +37,54 @@ export class VehicleService {
         `This vehicle-(${normalizedRegistrationNumber}) is already have an owner`,
       );
     } else if (existOwnerVehicle && !existOwnerVehicle.user_id) {
-      await this.prisma.vehicle.update({
+      const updatedVehicle = await this.prisma.vehicle.update({
         where: {
           id: existOwnerVehicle.id,
         },
         data: {
-          user_id,
+          user: {
+            connect: {
+              id: user_id,
+            },
+          },
         },
       });
-
       if (
         this.vehicleRepository.shouldRefreshMotData(
           existOwnerVehicle?.mot_last_checked_at,
         )
       ) {
-        await this.vehicleRepository.refreshVehicleDataFromDvla(
-          existOwnerVehicle,
-        );
+        await this.vehicleRepository.refreshVehicleDataFromDvla(updatedVehicle);
       }
       return ResponseHelper.success({
-        data: existOwnerVehicle,
         message: 'Vehicle added successfully',
+        data: null,
       });
     } else if (!existOwnerVehicle) {
       const newVehicle = await this.prisma.vehicle.create({
         data: {
           registration_number: normalizedRegistrationNumber,
-          user_id,
+          user: {
+            connect: {
+              id: user_id,
+            },
+          },
         },
       });
-      return ResponseHelper.success({
-        data: newVehicle,
-        message: 'Vehicle added successfully',
-      });
+
+      try {
+        await this.vehicleRepository.refreshVehicleDataFromDvla(newVehicle);
+
+        return ResponseHelper.success({
+          message: 'Vehicle added successfully',
+          data: null,
+        });
+      } catch (error) {
+        await this.prisma.vehicle.delete({
+          where: { id: newVehicle.id },
+        });
+        throw error;
+      }
     } else {
       throw new InternalServerErrorException('Failed to add vehicle');
     }
@@ -78,7 +93,12 @@ export class VehicleService {
   async getAllVehicles(user_id: string) {
     const vehicles = await this.prisma.vehicle.findMany({
       where: {
-        user_id,
+        user: {
+          id: user_id,
+        },
+        NOT: {
+          user_id: null,
+        },
       },
       orderBy: {
         created_at: 'desc',

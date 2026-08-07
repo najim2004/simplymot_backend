@@ -6,6 +6,7 @@ import {
   Param,
   Delete,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { VehicleService } from './vehicle.service';
 import { AddVehicleDto } from './dto/create-vehicle.dto';
@@ -19,10 +20,16 @@ import {
   ListVehiclesResponseDto,
   MotHistoryResponseDto,
 } from './dto/swagger/vehicle-api.dto';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guard/role/roles.guard';
+import { Roles } from 'src/common/guard/role/roles.decorator';
+import { Role } from 'src/common/guard/role/role.enum';
 
 @ApiTags('Vehicle')
 @ApiBearerAuth()
 @Controller('vehicle')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.DRIVER)
 export class VehicleController {
   constructor(private readonly vehicleService: VehicleService) {}
 
