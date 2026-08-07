@@ -84,18 +84,6 @@ export class RegisterUserDto {
 
   @ApiPropertyOptional({
     description:
-      'The name of the lead representative for the business. Required if kind is GARAGE.',
-    example: 'Jane Smith',
-  })
-  @ValidateIf((o) => o.kind === UserKind.GARAGE)
-  @IsNotEmpty({
-    message: 'primary_contact is mandatory when user kind is GARAGE',
-  })
-  @IsString()
-  primary_contact?: string;
-
-  @ApiPropertyOptional({
-    description:
       'Garage postcode. Used to calculate garage latitude/longitude.',
     example: 'SW1A 0AA',
   })
