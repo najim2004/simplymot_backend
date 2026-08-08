@@ -136,8 +136,8 @@ export class BookingService {
       endsAt = slot.ends_at;
       existingSlotId = slot.id;
     } else {
-      startsAt = createBookingDto.start_time!;
-      endsAt = createBookingDto.end_time!;
+      startsAt = createBookingDto.starts_at!;
+      endsAt = createBookingDto.ends_at!;
 
       const slotsData = await this.slotRepository.getSlots(
         createBookingDto.garage_id,

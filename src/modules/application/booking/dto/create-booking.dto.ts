@@ -16,15 +16,15 @@ import {
 class IsEndAfterStartConstraint implements ValidatorConstraintInterface {
   validate(endTime: Date, args: ValidationArguments) {
     const dto = args.object as CreateBookingDto;
-    if (dto.slot_id || !dto.start_time || !endTime) {
+    if (dto.slot_id || !dto.starts_at || !endTime) {
       return true;
     }
 
-    return new Date(endTime).getTime() > new Date(dto.start_time).getTime();
+    return new Date(endTime).getTime() > new Date(dto.starts_at).getTime();
   }
 
   defaultMessage() {
-    return 'end_time must be after start_time';
+    return 'ends_at must be after starts_at';
   }
 }
 
@@ -55,7 +55,7 @@ export class CreateBookingDto {
 
   @ApiPropertyOptional({
     description:
-      'Existing slot ID. If omitted, start_time and end_time are required.',
+      'Existing slot ID. If omitted, starts_at and ends_at are required.',
     example: 'clx1234567890abcdef',
   })
   @IsOptional()
@@ -70,11 +70,11 @@ export class CreateBookingDto {
   })
   @ValidateIf((dto) => !dto.slot_id)
   @IsNotEmpty({
-    message: 'start_time is required when slot_id is not provided',
+    message: 'starts_at is required when slot_id is not provided',
   })
   @Type(() => Date)
   @IsDate()
-  start_time?: Date;
+  starts_at?: Date;
 
   @ApiPropertyOptional({
     description:
@@ -82,12 +82,12 @@ export class CreateBookingDto {
     example: '2026-06-20T10:00:00.000Z',
   })
   @ValidateIf((dto) => !dto.slot_id)
-  @IsNotEmpty({ message: 'end_time is required when slot_id is not provided' })
+  @IsNotEmpty({ message: 'ends_at is required when slot_id is not provided' })
   @Type(() => Date)
   @IsDate()
   @Validate(IsEndAfterStartConstraint)
   @Validate(IsFutureDateConstraint)
-  end_time?: Date;
+  ends_at?: Date;
 
   @ApiPropertyOptional({
     description: 'Additional services or notes for the garage',
