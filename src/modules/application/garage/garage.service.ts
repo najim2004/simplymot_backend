@@ -48,6 +48,64 @@ type DiscoverVehicleDetails = {
   reminder_last_sent_at: Date | null;
   year_of_manufacture: number | null;
 };
+function formatTimeHHmm(date: Date | string | null): string | null {
+  if (!date) return null;
+  if (typeof date === 'string') {
+    if (date.length === 5 && date.includes(':')) return date;
+    date = new Date(date);
+  }
+  if (Number.isNaN((date as Date).getTime())) return null;
+  const hours = String((date as Date).getUTCHours()).padStart(2, '0');
+  const minutes = String((date as Date).getUTCMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+type ServiceWithClass = {
+  id: string;
+  title: string;
+  price: unknown;
+  type: ServiceType;
+  vehicle_class?: string | null;
+};
+
+function formatServicesResponse(services: ServiceWithClass[]) {
+  const motAndRetest = services.filter(
+    (s) => s.type === ServiceType.MOT || s.type === ServiceType.RETEST,
+  );
+  const otherServices = services.filter(
+    (s) => s.type !== ServiceType.MOT && s.type !== ServiceType.RETEST,
+  );
+
+  const mot_services_map: Record<
+    string,
+    {
+      vehicle_class: string | null;
+      mot: ServiceWithClass | null;
+      mot_retest: ServiceWithClass | null;
+    }
+  > = {};
+
+  motAndRetest.forEach((service) => {
+    const clsKey = service.vehicle_class || 'default';
+    if (!mot_services_map[clsKey]) {
+      mot_services_map[clsKey] = {
+        vehicle_class: service.vehicle_class || null,
+        mot: null,
+        mot_retest: null,
+      };
+    }
+    if (service.type === ServiceType.MOT) {
+      mot_services_map[clsKey].mot = service;
+    } else if (service.type === ServiceType.RETEST) {
+      mot_services_map[clsKey].mot_retest = service;
+    }
+  });
+
+  return {
+    mot_services: Object.values(mot_services_map),
+    other_services: otherServices,
+  };
+}
 
 @Injectable()
 export class GarageService {
@@ -321,23 +379,14 @@ export class GarageService {
         title: true,
         price: true,
         type: true,
+        vehicle_class: true,
       },
       orderBy: {
         created_at: 'desc',
       },
     });
 
-    const formattedServices = {
-      mot: services.find((service) => service.type === ServiceType.MOT),
-      mot_retest: services.find(
-        (service) => service.type === ServiceType.RETEST,
-      ),
-      other_services: services.filter(
-        (service) =>
-          service.type !== ServiceType.MOT &&
-          service.type !== ServiceType.RETEST,
-      ),
-    };
+    const formattedServices = formatServicesResponse(services);
 
     return ResponseHelper.success({
       message: 'Services fetched successfully',
@@ -350,7 +399,7 @@ export class GarageService {
     garage_id: string,
     user_id: string,
   ) {
-    const services = updateGarageDto.services;
+    const services = updateGarageDto.services || [];
     const garage = await this.prisma.garage.findUnique({
       where: {
         id: garage_id,
@@ -363,13 +412,18 @@ export class GarageService {
     const updatedServices = await Promise.all(
       services.map(async (service) => {
         const { id, type, ...rest } = service;
+        const vehicleClass = service.vehicle_class ?? null;
+
         if (type === ServiceType.MOT || type === ServiceType.RETEST) {
-          const whereClause = {
+          const whereClause: Prisma.ServiceWhereInput = {
             garage_id: garage.id,
             type: service.type,
+            ...(vehicleClass ? { vehicle_class: vehicleClass } : {}),
           };
 
-          const title = service.type === ServiceType.MOT ? 'MOT' : 'MOT Retest';
+          const title =
+            service.title ||
+            (service.type === ServiceType.MOT ? 'MOT' : 'MOT Retest');
 
           const existingService = await this.prisma.service.findFirst({
             where: whereClause,
@@ -377,37 +431,41 @@ export class GarageService {
 
           return await this.prisma.service.upsert({
             where: {
-              id: existingService?.id || '',
+              id: existingService?.id || service.id || '',
             },
-            update: { ...rest },
+            update: {
+              price: rest.price,
+              title: service.title,
+            },
             create: {
               garage_id: garage.id,
               type: type,
               price: rest.price ?? 0,
               title,
+              vehicle_class: vehicleClass,
             },
             select: {
               id: true,
               title: true,
               price: true,
               type: true,
+              vehicle_class: true,
             },
           });
         } else {
-          if (!service.id) {
-            throw new Error(`ID required for service type: ${service.type}`);
-          }
-
           return await this.prisma.service.upsert({
             where: {
               id: service.id || '',
             },
-            update: { ...rest },
+            update: {
+              title: service.title,
+              price: rest.price,
+            },
             create: {
               garage_id: garage.id,
               type: type,
               price: rest.price ?? 0,
-              title: service.title,
+              title: service.title || 'Service',
             },
             select: {
               id: true,
@@ -488,12 +546,27 @@ export class GarageService {
           schedule_intervals: {
             create: this.dayOfWeekOrder.map((day) => ({
               day_of_week: day,
-              is_closed: false,
+              is_closed: day === DayOfWeek.SUNDAY,
               slot_duration: 60,
               buffer_time: 0,
-              open_time: '09:00',
-              close_time: '17:00',
+              open_time:
+                day === DayOfWeek.SUNDAY
+                  ? null
+                  : new Date('1970-01-01T09:00:00.000Z'),
+              close_time:
+                day === DayOfWeek.SUNDAY
+                  ? null
+                  : new Date('1970-01-01T17:00:00.000Z'),
             })),
+          },
+          breakTimes: {
+            create: [
+              {
+                starts_at: new Date('1970-01-01T13:00:00.000Z'),
+                ends_at: new Date('1970-01-01T14:00:00.000Z'),
+                description: 'Lunch Break',
+              },
+            ],
           },
         },
         select: {
@@ -513,9 +586,20 @@ export class GarageService {
         },
       });
     }
+    const formattedIntervals = (schedule?.schedule_intervals || []).map(
+      (i) => ({
+        ...i,
+        open_time: formatTimeHHmm(i.open_time),
+        close_time: formatTimeHHmm(i.close_time),
+      }),
+    );
+
     return ResponseHelper.success({
       message: 'Schedule fetched successfully',
-      data: schedule,
+      data: {
+        ...schedule,
+        schedule_intervals: formattedIntervals,
+      },
     });
   }
 
@@ -555,13 +639,23 @@ export class GarageService {
     const existing = schedule_intervals.filter((i) => i.id);
     const newItems = schedule_intervals.filter((i) => !i.id);
 
+    const parseTimeStringToDate = (
+      timeStr?: string | Date | null,
+    ): Date | null => {
+      if (!timeStr) return null;
+      if (timeStr instanceof Date) return timeStr;
+      if (typeof timeStr === 'string' && timeStr.includes('T'))
+        return new Date(timeStr);
+      return new Date(`1970-01-01T${timeStr}:00.000Z`);
+    };
+
     const toCreateInput = (i: ScheduleIntervalDto) => ({
       day_of_week: i.day_of_week ?? getNextDay(),
       is_closed: i.is_closed ?? false,
       slot_duration: i.slot_duration ?? 60,
       buffer_time: i.buffer_time ?? 0,
-      open_time: i.open_time ?? '09:00',
-      close_time: i.close_time ?? '17:00',
+      open_time: parseTimeStringToDate(i.open_time ?? '09:00'),
+      close_time: parseTimeStringToDate(i.close_time ?? '17:00'),
     });
 
     const schedule = await this.prisma.schedule.upsert({
@@ -913,6 +1007,7 @@ export class GarageService {
             title: true,
             price: true,
             type: true,
+            vehicle_class: true,
           },
           orderBy: {
             created_at: 'desc',
@@ -941,17 +1036,64 @@ export class GarageService {
       throw new NotFoundException('Garage not found');
     }
 
+    let schedule = garage.schedule;
+    if (!schedule) {
+      schedule = await this.prisma.schedule.create({
+        data: {
+          garage_id: garage.id,
+          schedule_intervals: {
+            create: this.dayOfWeekOrder.map((day) => ({
+              day_of_week: day,
+              is_closed: day === DayOfWeek.SUNDAY,
+              slot_duration: 60,
+              buffer_time: 0,
+              open_time:
+                day === DayOfWeek.SUNDAY
+                  ? null
+                  : new Date('1970-01-01T09:00:00.000Z'),
+              close_time:
+                day === DayOfWeek.SUNDAY
+                  ? null
+                  : new Date('1970-01-01T17:00:00.000Z'),
+            })),
+          },
+          breakTimes: {
+            create: [
+              {
+                starts_at: new Date('1970-01-01T13:00:00.000Z'),
+                ends_at: new Date('1970-01-01T14:00:00.000Z'),
+                description: 'Lunch Break',
+              },
+            ],
+          },
+        },
+        select: {
+          id: true,
+          schedule_intervals: {
+            select: {
+              id: true,
+              day_of_week: true,
+              is_closed: true,
+              slot_duration: true,
+              buffer_time: true,
+              open_time: true,
+              close_time: true,
+            },
+          },
+        },
+      });
+    }
+
     const services = garage.services || [];
-    const formattedServices = {
-      mot: services.find((service) => service.type === ServiceType.MOT) || null,
-      mot_retest:
-        services.find((service) => service.type === ServiceType.RETEST) || null,
-      other_services: services.filter(
-        (service) =>
-          service.type !== ServiceType.MOT &&
-          service.type !== ServiceType.RETEST,
-      ),
-    };
+    const formattedServices = formatServicesResponse(services);
+
+    const formattedIntervals = (schedule?.schedule_intervals || []).map(
+      (i) => ({
+        ...i,
+        open_time: formatTimeHHmm(i.open_time),
+        close_time: formatTimeHHmm(i.close_time),
+      }),
+    );
 
     const formattedGarage = {
       id: garage.id,
@@ -965,7 +1107,12 @@ export class GarageService {
         ? SojebStorage.url(garage.garage_image)
         : null,
       services: formattedServices,
-      schedule: garage.schedule,
+      schedule: schedule
+        ? {
+            ...schedule,
+            schedule_intervals: formattedIntervals,
+          }
+        : null,
     };
 
     return ResponseHelper.success({

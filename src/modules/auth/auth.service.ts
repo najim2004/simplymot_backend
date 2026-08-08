@@ -31,7 +31,7 @@ import {
   VerifyEmailDto,
   CheckOTPValidationDto,
 } from './dto/auth.dto';
-import { UserAccountStatus, UserKind } from 'prisma/generated/enums';
+import { DayOfWeek, UserAccountStatus, UserKind } from 'prisma/generated/enums';
 import { Prisma } from 'prisma/generated/client';
 import { PostCodeMapRepository } from 'src/common/repository/post-code-map/post-code-map.repository';
 import { SubscriptionService } from '../application/subscription/subscription.service';
@@ -403,6 +403,37 @@ export class AuthService {
           post_code: post_code?.trim().toUpperCase(),
           latitude: location?.lat,
           longitude: location?.lng,
+          schedule: {
+            create: {
+              schedule_intervals: {
+                create: [
+                  DayOfWeek.MONDAY,
+                  DayOfWeek.TUESDAY,
+                  DayOfWeek.WEDNESDAY,
+                  DayOfWeek.THURSDAY,
+                  DayOfWeek.FRIDAY,
+                  DayOfWeek.SATURDAY,
+                  DayOfWeek.SUNDAY,
+                ].map((day) => ({
+                  day_of_week: day,
+                  is_closed: day === DayOfWeek.SUNDAY,
+                  slot_duration: 60,
+                  buffer_time: 0,
+                  open_time: day === DayOfWeek.SUNDAY ? null : new Date('1970-01-01T09:00:00.000Z'),
+                  close_time: day === DayOfWeek.SUNDAY ? null : new Date('1970-01-01T17:00:00.000Z'),
+                })),
+              },
+              breakTimes: {
+                create: [
+                  {
+                    starts_at: new Date('1970-01-01T13:00:00.000Z'),
+                    ends_at: new Date('1970-01-01T14:00:00.000Z'),
+                    description: 'Lunch Break',
+                  },
+                ],
+              },
+            },
+          },
         },
       });
       try {

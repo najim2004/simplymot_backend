@@ -278,7 +278,6 @@ model Schedule {
   garage_id String @unique
 
   // Relations
-  // time_slots TimeSlot[]
   holidays           Holiday[]
   breakTimes         BreakTime[]
   timeSlots          TimeSlot[]
@@ -351,7 +350,7 @@ model TimeSlot {
 
   status      TimeSlotStatus @default(AVAILABLE)
   description String?
-  
+
   garage_id   String?
   booking_id  String? @unique
   schedule_id String?
@@ -382,10 +381,11 @@ model Service {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  title     String
-  type      ServiceType
-  price     Decimal?    @db.Decimal(12, 2)
-  garage_id String
+  title         String
+  type          ServiceType
+  vehicle_class String?
+  price         Decimal?    @db.Decimal(12, 2)
+  garage_id     String
 
   garage       Garage        @relation(fields: [garage_id], references: [id], onDelete: Cascade)
   bookingItems BookingItem[]
@@ -500,29 +500,29 @@ model Vehicle {
   year_of_manufacture   Int?
 
   user_id             String?
-  registration_number String    @unique
+  registration_number String  @unique
   make                String?
   model               String?
   color               String?
   fuel_type           String?
   engine_capacity     Int?
   co2_emissions       Int?
-  mot_status          String?   // PASSED, FAILED, EXPIRED (derived or from DVSA)
-  is_expired          Boolean   @default(false)
+  mot_status          String? // PASSED, FAILED, EXPIRED (derived or from DVSA)
+  is_expired          Boolean @default(false)
 
   // Tax & DVLA Compliance
-  tax_status              String?   // e.g. Taxed
+  tax_status              String? // e.g. Taxed
   tax_due_date            DateTime? // e.g. 2027-05-01
-  revenue_weight          Int?      // e.g. 2020
-  wheelplan               String?   // e.g. 2 AXLE RIGID BODY
-  type_approval           String?   // e.g. M1
-  month_of_first_reg      String?   // e.g. 2013-01
+  revenue_weight          Int? // e.g. 2020
+  wheelplan               String? // e.g. 2 AXLE RIGID BODY
+  type_approval           String? // e.g. M1
+  month_of_first_reg      String? // e.g. 2013-01
   date_of_last_v5c_issued DateTime?
   marked_for_export       Boolean   @default(false)
 
-  raw_mot_data        Json?
-  raw_dvla_data       Json?
-  raw_mot_status      String?   // PASSED, FAILED, EXPIRED (derived or from DVSA)
+  raw_mot_data   Json?
+  raw_dvla_data  Json?
+  raw_mot_status String? // PASSED, FAILED, EXPIRED (derived or from DVSA)
 
   mot_history MotHistory[]
   user        User?        @relation(fields: [user_id], references: [id], onDelete: SetNull)
@@ -704,12 +704,12 @@ model PromoCode {
   duration_days      Int?
   duration_in_months Int?
   max_redemptions    Int?
-  redeemed_count     Int               @default(0)
+  redeemed_count     Int             @default(0)
   expires_at         DateTime?
-  status             PromoCodeStatus   @default(PENDING)
+  status             PromoCodeStatus @default(PENDING)
 
   stripe_coupon_id         String
-  stripe_promotion_code_id String            @unique
+  stripe_promotion_code_id String  @unique
   created_by_id            String?
 
   @@index([status])

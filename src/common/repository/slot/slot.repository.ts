@@ -42,7 +42,7 @@ export class SlotRepository {
     const { start: dayStart, end: dayEnd } = this.getDayBounds(query.date);
     const dayOfWeek = this.dayMap[dayStart.getDay()];
 
-    const garage = await this.prisma.garage.findUnique({
+    let garage = await this.prisma.garage.findUnique({
       where: { id: garage_id },
       select: {
         id: true,
@@ -91,7 +91,90 @@ export class SlotRepository {
     });
 
     if (!garage) throw new NotFoundException('Garage not found');
-    if (!garage.schedule) throw new NotFoundException('Schedule not found');
+
+    if (!garage.schedule) {
+      await this.prisma.schedule.create({
+        data: {
+          garage_id: garage.id,
+          schedule_intervals: {
+            create: this.dayMap.map((day) => ({
+              day_of_week: day,
+              is_closed: day === DayOfWeek.SUNDAY,
+              slot_duration: 60,
+              buffer_time: 0,
+              open_time:
+                day === DayOfWeek.SUNDAY
+                  ? null
+                  : new Date('1970-01-01T09:00:00.000Z'),
+              close_time:
+                day === DayOfWeek.SUNDAY
+                  ? null
+                  : new Date('1970-01-01T17:00:00.000Z'),
+            })),
+          },
+          breakTimes: {
+            create: [
+              {
+                starts_at: new Date('1970-01-01T13:00:00.000Z'),
+                ends_at: new Date('1970-01-01T14:00:00.000Z'),
+                description: 'Lunch Break',
+              },
+            ],
+          },
+        },
+      });
+
+      garage = await this.prisma.garage.findUnique({
+        where: { id: garage_id },
+        select: {
+          id: true,
+          schedule: {
+            select: {
+              id: true,
+              schedule_intervals: {
+                where: { day_of_week: dayOfWeek },
+                select: {
+                  is_closed: true,
+                  slot_duration: true,
+                  buffer_time: true,
+                  open_time: true,
+                  close_time: true,
+                },
+                take: 1,
+              },
+              breakTimes: {
+                where: {
+                  starts_at: { lt: dayEnd },
+                  ends_at: { gt: dayStart },
+                },
+                select: {
+                  starts_at: true,
+                  ends_at: true,
+                  description: true,
+                },
+                orderBy: { starts_at: 'asc' },
+              },
+              holidays: {
+                where: {
+                  OR: [
+                    { date: { gte: dayStart, lt: dayEnd } },
+                    { is_recurring: true },
+                  ],
+                },
+                select: {
+                  date: true,
+                  name: true,
+                  is_recurring: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    if (!garage || !garage.schedule)
+      throw new NotFoundException('Schedule not found');
 
     const interval = garage.schedule.schedule_intervals[0];
     const holiday = garage.schedule.holidays.find((item) =>

@@ -10,6 +10,7 @@ import {
   TimeSlotStatus,
   UserKind,
   AuditAction,
+  DayOfWeek,
 } from 'prisma/generated/enums';
 import { Prisma } from 'prisma/generated/client';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -58,7 +59,38 @@ export class BookingService {
     }
 
     if (!garage.schedule) {
-      throw new NotFoundException('Schedule not found');
+      await this.prisma.schedule.create({
+        data: {
+          garage_id: garage.id,
+          schedule_intervals: {
+            create: [
+              DayOfWeek.MONDAY,
+              DayOfWeek.TUESDAY,
+              DayOfWeek.WEDNESDAY,
+              DayOfWeek.THURSDAY,
+              DayOfWeek.FRIDAY,
+              DayOfWeek.SATURDAY,
+              DayOfWeek.SUNDAY,
+            ].map((day) => ({
+              day_of_week: day,
+              is_closed: day === DayOfWeek.SUNDAY,
+              slot_duration: 60,
+              buffer_time: 0,
+              open_time: day === DayOfWeek.SUNDAY ? null : new Date('1970-01-01T09:00:00.000Z'),
+              close_time: day === DayOfWeek.SUNDAY ? null : new Date('1970-01-01T17:00:00.000Z'),
+            })),
+          },
+          breakTimes: {
+            create: [
+              {
+                starts_at: new Date('1970-01-01T13:00:00.000Z'),
+                ends_at: new Date('1970-01-01T14:00:00.000Z'),
+                description: 'Lunch Break',
+              },
+            ],
+          },
+        },
+      });
     }
 
     let startsAt: Date;

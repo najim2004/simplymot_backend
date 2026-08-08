@@ -134,6 +134,14 @@ export class ServiceDto {
   @IsNumber()
   @IsOptional()
   price?: number;
+
+  @ApiPropertyOptional({
+    description: 'Vehicle class (e.g. Class 4, Class 7)',
+    example: 'Class 4',
+  })
+  @IsString()
+  @IsOptional()
+  vehicle_class?: string;
 }
 
 export class UpsertServiceDto {
