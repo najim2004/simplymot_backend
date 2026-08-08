@@ -148,14 +148,25 @@ export class GarageServiceDto {
 
   @ApiProperty()
   type: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  vehicle_class?: string | null;
 }
 
-export class GarageServicesBundleDto {
+export class MotClassGroupDto {
+  @ApiPropertyOptional({ nullable: true })
+  vehicle_class: string | null;
+
   @ApiPropertyOptional({ type: GarageServiceDto, nullable: true })
   mot: GarageServiceDto | null;
 
   @ApiPropertyOptional({ type: GarageServiceDto, nullable: true })
   mot_retest: GarageServiceDto | null;
+}
+
+export class GarageServicesBundleDto {
+  @ApiProperty({ type: [MotClassGroupDto] })
+  mot_services: MotClassGroupDto[];
 
   @ApiProperty({ type: [GarageServiceDto] })
   other_services: GarageServiceDto[];
@@ -177,11 +188,11 @@ export class ScheduleIntervalDto {
   @ApiProperty()
   buffer_time: number;
 
-  @ApiProperty({ type: String, format: 'date-time' })
-  open_time: Date;
+  @ApiPropertyOptional({ nullable: true, example: '09:00' })
+  open_time: string | null;
 
-  @ApiProperty({ type: String, format: 'date-time' })
-  close_time: Date;
+  @ApiPropertyOptional({ nullable: true, example: '17:00' })
+  close_time: string | null;
 }
 
 export class GarageScheduleDto {

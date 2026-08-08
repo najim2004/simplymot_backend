@@ -7,7 +7,9 @@ import {
   IsEnum,
   IsArray,
   IsBoolean,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DayOfWeek, ServiceType } from 'prisma/generated/enums';
 
@@ -146,30 +148,32 @@ export class ServiceDto {
 
 export class UpsertServiceDto {
   @ApiProperty({
-    description: 'Services',
+    description: 'Services list',
+    type: [ServiceDto],
     example: [
       {
-        id: '1',
-        title: 'MOT',
+        title: 'MOT Class 4',
         type: 'MOT',
         price: 50,
+        vehicle_class: 'Class 4',
       },
       {
-        id: '2',
-        title: 'Service',
+        title: 'MOT Retest Class 4',
         type: 'RETEST',
-        price: 50,
+        price: 20,
+        vehicle_class: 'Class 4',
       },
       {
-        id: '3',
-        title: 'Service',
-        type: 'SERVICE',
-        price: 50,
+        title: 'Full Service',
+        type: 'OTHERS',
+        price: 120,
       },
     ],
   })
   @IsArray()
   @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ServiceDto)
   services?: ServiceDto[];
 }
 
