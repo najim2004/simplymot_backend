@@ -37,7 +37,6 @@ import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { apiTypedDoc } from 'src/common/swagger/api-doc';
 import {
   BreakTimeResponseDto,
-  BreakTimesListResponseDto,
   DeleteServiceResponseDto,
   DiscoverGarageResponseDto,
   DiscoverGaragesResponseDto,
@@ -162,28 +161,6 @@ export class GarageController {
   ) {
     return this.garageService.createBreakTime(
       createBreakTimeDto,
-      garage_id,
-      schedule_interval_id,
-      user_id,
-    );
-  }
-
-  @apiTypedDoc(
-    {
-      summary: 'List break times',
-      description: 'GARAGE + JWT. Lists breaks for a schedule interval.',
-    },
-    { type: BreakTimesListResponseDto },
-  )
-  @Get(':garage_id/schedule_interval/:schedule_interval_id/break_times')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.GARAGE)
-  getBreakTimes(
-    @Param('garage_id') garage_id: string,
-    @Param('schedule_interval_id') schedule_interval_id: string,
-    @User('id') user_id: string,
-  ) {
-    return this.garageService.getBreakTimes(
       garage_id,
       schedule_interval_id,
       user_id,

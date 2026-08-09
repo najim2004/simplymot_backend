@@ -817,58 +817,6 @@ export class GarageService {
     });
   }
 
-  async getBreakTimes(
-    garage_id: string,
-    schedule_interval_id: string,
-    user_id: string,
-  ) {
-    const garage = await this.prisma.garage.findUnique({
-      where: {
-        id: garage_id,
-        owner_id: user_id,
-      },
-    });
-    if (!garage) {
-      throw new NotFoundException('Garage not found');
-    }
-    const interval = await this.prisma.scheduleInterval.findFirst({
-      where: {
-        id: schedule_interval_id,
-        schedule: {
-          garage_id: garage.id,
-        },
-      },
-    });
-    if (!interval) {
-      throw new NotFoundException('Schedule interval not found');
-    }
-
-    const breakTimes = await this.prisma.breakTime.findMany({
-      where: {
-        schedule_interval_id: interval.id,
-      },
-      select: {
-        id: true,
-        start_time: true,
-        end_time: true,
-        description: true,
-        schedule_interval_id: true,
-      },
-      orderBy: { start_time: 'asc' },
-    });
-
-    const formatted = breakTimes.map((b) => ({
-      ...b,
-      start_time: formatTimeHHmm(b.start_time),
-      end_time: formatTimeHHmm(b.end_time),
-    }));
-
-    return ResponseHelper.success({
-      message: 'Break times fetched successfully',
-      data: formatted,
-    });
-  }
-
   async deleteBreakTime(
     break_time_id: string,
     garage_id: string,
