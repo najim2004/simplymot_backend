@@ -6,14 +6,21 @@ import { PrismaService } from '../../../prisma/prisma.service';
 export class ContactService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createContactDto: CreatePublicContactDto) {
+  async create(createContactDto: CreatePublicContactDto, userId?: string) {
     try {
-      const data = {};
-      if (createContactDto.first_name) {
-        data['first_name'] = createContactDto.first_name;
+      const data: Record<string, any> = {};
+
+      if (userId) {
+        data['user_id'] = userId;
       }
-      if (createContactDto.last_name) {
-        data['last_name'] = createContactDto.last_name;
+      if (createContactDto.name) {
+        data['name'] = createContactDto.name;
+      }
+      if (createContactDto.garage_name) {
+        data['garage_name'] = createContactDto.garage_name;
+      }
+      if (createContactDto.primary_contact) {
+        data['primary_contact'] = createContactDto.primary_contact;
       }
       if (createContactDto.email) {
         data['email'] = createContactDto.email;
@@ -24,16 +31,25 @@ export class ContactService {
       if (createContactDto.message) {
         data['message'] = createContactDto.message;
       }
+      if (createContactDto.source) {
+        data['source'] = createContactDto.source;
+      }
+      if (createContactDto.first_name) {
+        data['first_name'] = createContactDto.first_name;
+      }
+      if (createContactDto.last_name) {
+        data['last_name'] = createContactDto.last_name;
+      }
 
       await this.prisma.contact.create({
-        data: data,
+        data,
       });
 
       return {
         success: true,
         message: 'Submitted successfully',
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
         message: error.message,

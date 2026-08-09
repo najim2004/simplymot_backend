@@ -219,6 +219,7 @@ model User {
   vehicles               Vehicle[]
   timeSlots              TimeSlot[]
   bookings               Booking[]
+  contacts               Contact[]
 
   @@index([deleted_at])
   @@index([status])
@@ -971,12 +972,21 @@ model Contact {
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
+  user_id String?
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  name            String?
+  garage_name     String?
+  primary_contact String?
+  email           String?
+  phone_number    String?
+  message         String?
+  source          String?
+
   first_name   String?
   last_name    String?
-  email        String?
-  phone_number String?
-  message      String?
 
+  @@index([user_id])
   @@index([email])
   @@index([deleted_at])
   @@map("contacts")

@@ -419,8 +419,14 @@ export class AuthService {
                   is_closed: day === DayOfWeek.SUNDAY,
                   slot_duration: 60,
                   buffer_time: 0,
-                  open_time: day === DayOfWeek.SUNDAY ? null : new Date('1970-01-01T09:00:00.000Z'),
-                  close_time: day === DayOfWeek.SUNDAY ? null : new Date('1970-01-01T17:00:00.000Z'),
+                  open_time:
+                    day === DayOfWeek.SUNDAY
+                      ? null
+                      : new Date('1970-01-01T09:00:00.000Z'),
+                  close_time:
+                    day === DayOfWeek.SUNDAY
+                      ? null
+                      : new Date('1970-01-01T17:00:00.000Z'),
                 })),
               },
               breakTimes: {
