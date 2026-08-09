@@ -4,8 +4,8 @@ import {
   InvoiceStatus,
   PaymentTransactionKind,
   PaymentTransactionStatus,
-} from 'prisma/generated/enums';
-import { Prisma } from 'prisma/generated/client';
+} from '@generated/prisma/enums';
+import { Prisma } from '@generated/prisma';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 export type SubscriptionPaymentContext = {

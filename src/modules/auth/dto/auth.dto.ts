@@ -9,7 +9,7 @@ import {
   ValidateIf,
   // Matches,
 } from 'class-validator';
-import { UserKind } from 'prisma/generated/enums';
+import { UserKind } from '@generated/prisma/enums';
 
 export class RegisterUserDto {
   @ApiProperty({

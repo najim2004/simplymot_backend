@@ -5,7 +5,7 @@ import {
   PaymentTransactionKind,
   PaymentTransactionStatus,
   UserKind,
-} from 'prisma/generated/enums';
+} from '@generated/prisma/enums';
 
 export class QueryTransactionDto {
   @ApiProperty({ description: 'Page number', example: 1, default: 1 })

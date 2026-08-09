@@ -4,7 +4,7 @@ import { v4 as uuid } from 'uuid';
 import { DateHelper } from '../../helper/date.helper';
 import { UserRepository } from '../user/user.repository';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { UcodeStatus } from 'prisma/generated/enums';
+import { UcodeStatus } from '@generated/prisma/enums';
 
 @Injectable()
 export class UcodeRepository {

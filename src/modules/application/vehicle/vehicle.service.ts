@@ -9,7 +9,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { VehicleRepository } from 'src/common/repository/vehicle/vehicle.repository';
 import { ResponseHelper } from 'src/common/helper/response.helper';
 import { QueryMotHistoryDto } from './dto/query-vehicle.dto';
-import { Prisma } from 'prisma/generated/client';
+import { Prisma } from '@generated/prisma';
 @Injectable()
 export class VehicleService {
   constructor(

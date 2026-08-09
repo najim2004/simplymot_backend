@@ -23,7 +23,7 @@ export class SeedCommand extends CommandRunner {
       console.log(`Prisma Env: ${process.env.PRISMA_ENV}`);
       console.log('Seeding started...');
 
-      // begin transaaction
+      // begin transaction
       await this.prisma.$transaction(async ($tx) => {
         await this.roleSeed();
         await this.permissionSeed();
@@ -39,20 +39,34 @@ export class SeedCommand extends CommandRunner {
 
   //---- user section ----
   async userSeed() {
-    // system admin, user id: 1
-    const systemUser = await this.userRepository.createSuAdminUser({
-      name: appConfig().defaultUser.system.username,
-      username: appConfig().defaultUser.system.username,
-      email: appConfig().defaultUser.system.email,
-      password: appConfig().defaultUser.system.password,
-    });
+    let systemUser = await this.userRepository.getUserByEmail(
+      appConfig().defaultUser.system.email,
+    );
 
-    await this.prisma.roleUser.create({
-      data: {
+    if (!systemUser) {
+      systemUser = await this.userRepository.createSuAdminUser({
+        name: appConfig().defaultUser.system.username,
+        username: appConfig().defaultUser.system.username,
+        email: appConfig().defaultUser.system.email,
+        password: appConfig().defaultUser.system.password,
+      });
+    }
+
+    const existingRoleUser = await this.prisma.roleUser.findFirst({
+      where: {
         user_id: systemUser.id,
         role_id: '1',
       },
     });
+
+    if (!existingRoleUser) {
+      await this.prisma.roleUser.create({
+        data: {
+          user_id: systemUser.id,
+          role_id: '1',
+        },
+      });
+    }
   }
 
   async permissionSeed() {
@@ -106,6 +120,7 @@ export class SeedCommand extends CommandRunner {
 
     await this.prisma.permission.createMany({
       data: permissions,
+      skipDuplicates: true,
     });
   }
 
@@ -114,7 +129,6 @@ export class SeedCommand extends CommandRunner {
     const su_admin_permissions = all_permissions.filter(function (permission) {
       return permission.title.substring(0, 25) == 'system_tenant_management_';
     });
-    // const su_admin_permissions = all_permissions;
 
     // -----su admin permission---
     const adminPermissionRoleArray = [];
@@ -126,6 +140,7 @@ export class SeedCommand extends CommandRunner {
     }
     await this.prisma.permissionRole.createMany({
       data: adminPermissionRoleArray,
+      skipDuplicates: true,
     });
     // -----------
 
@@ -145,6 +160,7 @@ export class SeedCommand extends CommandRunner {
     }
     await this.prisma.permissionRole.createMany({
       data: projectAdminPermissionRoleArray,
+      skipDuplicates: true,
     });
     // -----------
 
@@ -166,10 +182,11 @@ export class SeedCommand extends CommandRunner {
       projectManagerPermissionRoleArray.push({
         role_id: '3',
         permission_id: project_manager_permission.id,
-      });
+        });
     }
     await this.prisma.permissionRole.createMany({
       data: projectManagerPermissionRoleArray,
+      skipDuplicates: true,
     });
     // -----------
 
@@ -194,6 +211,7 @@ export class SeedCommand extends CommandRunner {
     }
     await this.prisma.permissionRole.createMany({
       data: memberPermissionRoleArray,
+      skipDuplicates: true,
     });
     // -----------
 
@@ -216,6 +234,7 @@ export class SeedCommand extends CommandRunner {
     }
     await this.prisma.permissionRole.createMany({
       data: viewerPermissionRoleArray,
+      skipDuplicates: true,
     });
     // -----------
   }
@@ -251,6 +270,7 @@ export class SeedCommand extends CommandRunner {
           name: 'viewer',
         },
       ],
+      skipDuplicates: true,
     });
   }
 }

@@ -4,8 +4,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationRepository } from 'src/common/repository/notification/notification.repository';
 import { ResponseHelper } from 'src/common/helper/response.helper';
 import { NotificationGateway } from 'src/common/gateway/notification.gateway';
-import { Prisma } from 'prisma/generated/client';
-import { UserKind } from 'prisma/generated/enums';
+import { Prisma } from '@generated/prisma';
+import { UserKind } from '@generated/prisma/enums';
 import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
 import appConfig from 'src/config/app.config';
 

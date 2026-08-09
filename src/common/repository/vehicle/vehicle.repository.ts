@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Vehicle } from 'prisma/generated/client';
+import { Vehicle } from '@generated/prisma';
 import { DvlaService } from 'src/common/lib/DVLA/DvlaService';
 import { PrismaService } from 'src/prisma/prisma.service';
 

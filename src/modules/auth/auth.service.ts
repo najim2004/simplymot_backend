@@ -31,8 +31,12 @@ import {
   VerifyEmailDto,
   CheckOTPValidationDto,
 } from './dto/auth.dto';
-import { DayOfWeek, UserAccountStatus, UserKind } from 'prisma/generated/enums';
-import { Prisma } from 'prisma/generated/client';
+import {
+  DayOfWeek,
+  UserAccountStatus,
+  UserKind,
+} from '@generated/prisma/enums';
+import { Prisma } from '@generated/prisma';
 import { PostCodeMapRepository } from 'src/common/repository/post-code-map/post-code-map.repository';
 import { SubscriptionService } from '../application/subscription/subscription.service';
 
@@ -75,16 +79,6 @@ export class AuthService {
           address: true,
           phone_number: true,
           kind: true,
-          garages: {
-            select: {
-              id: true,
-              garage_name: true,
-              vts_number: true,
-              contact_email: true,
-              phone_number: true,
-            },
-            take: 1,
-          },
           created_at: true,
           email_verified_at: true,
           status: true,
@@ -96,7 +90,7 @@ export class AuthService {
       }
 
       if (dbUser.avatar) {
-        dbUser['avatar_url'] = SojebStorage.url(
+        dbUser['avatar'] = SojebStorage.url(
           appConfig().storageUrl.avatar + dbUser.avatar,
         );
       }

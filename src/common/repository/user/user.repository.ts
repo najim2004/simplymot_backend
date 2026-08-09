@@ -6,7 +6,7 @@ import { ArrayHelper } from '../../helper/array.helper';
 import { Role } from '../../guard/role/role.enum';
 import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { UserKind } from 'prisma/generated/client';
+import { UserKind } from '@generated/prisma';
 
 @Injectable()
 export class UserRepository {

@@ -13,10 +13,10 @@ import {
   PeriodType,
   SubscriptionPlanStatus,
   SubscriptionStatus,
-} from 'prisma/generated/enums';
+} from '@generated/prisma/enums';
 import { ResponseHelper } from 'src/common/helper/response.helper';
 import { QuerySubscriptionPlanDto } from './dto/query-subscription.dto';
-import { Prisma } from 'prisma/generated/client';
+import { Prisma } from '@generated/prisma';
 import type Stripe from 'stripe';
 
 @Injectable()

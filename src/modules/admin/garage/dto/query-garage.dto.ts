@@ -7,7 +7,7 @@ import {
   IsNumber,
   IsDate,
 } from 'class-validator';
-import { UserAccountStatus } from 'prisma/generated/enums';
+import { UserAccountStatus } from '@generated/prisma/enums';
 
 export class QueryGarageDto {
   @IsOptional()

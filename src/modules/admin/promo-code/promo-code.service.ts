@@ -8,8 +8,8 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ResponseHelper } from 'src/common/helper/response.helper';
 import { StripePayment } from 'src/common/lib/Payment/stripe/StripePayment';
-import { PromoCodeDuration, PromoCodeStatus } from 'prisma/generated/enums';
-import { Prisma } from 'prisma/generated/client';
+import { PromoCodeDuration, PromoCodeStatus } from '@generated/prisma/enums';
+import { Prisma } from '@generated/prisma';
 import {
   CreatePromoCodeDto,
   PromoCodeTypeDto,

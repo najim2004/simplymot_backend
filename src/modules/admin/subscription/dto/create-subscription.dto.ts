@@ -10,7 +10,7 @@ import {
   IsArray,
   IsEnum,
 } from 'class-validator';
-import { PeriodType, SubscriptionPlanStatus } from 'prisma/generated/enums';
+import { PeriodType, SubscriptionPlanStatus } from '@generated/prisma/enums';
 
 export class CreateSubscriptionDto {}
 
@@ -56,8 +56,8 @@ export class CreateSubscriptionPlanDto {
 
   @ApiProperty({
     description: 'Whether plan is active and available for subscription',
-    example: true,
-    default: true,
+    example: SubscriptionPlanStatus.ACTIVE,
+    default: SubscriptionPlanStatus.ACTIVE,
   })
   @IsOptional()
   @IsEnum(SubscriptionPlanStatus)

@@ -15,8 +15,8 @@ import {
   SubscriptionStatus,
   UserKind,
   AuditAction,
-} from 'prisma/generated/enums';
-import { Prisma } from 'prisma/generated/client';
+} from '@generated/prisma/enums';
+import { Prisma } from '@generated/prisma';
 import type Stripe from 'stripe';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { QuerySubscriptionDto } from './dto/query-subscription.dto';

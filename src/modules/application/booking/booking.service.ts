@@ -11,8 +11,8 @@ import {
   UserKind,
   AuditAction,
   DayOfWeek,
-} from 'prisma/generated/enums';
-import { Prisma } from 'prisma/generated/client';
+} from '@generated/prisma/enums';
+import { Prisma } from '@generated/prisma';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { QueryBookingDto } from './dto/query-booking.dto';
 import {

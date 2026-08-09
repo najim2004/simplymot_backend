@@ -9,7 +9,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { BookingStatus } from 'prisma/generated/enums';
+import { BookingStatus } from '@generated/prisma/enums';
 
 export class QueryBookingDto {
   @ApiPropertyOptional({ example: 'clx1234567890abcdef' })

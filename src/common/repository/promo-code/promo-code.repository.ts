@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StripePayment } from 'src/common/lib/Payment/stripe/StripePayment';
-import { PromoCodeStatus } from 'prisma/generated/enums';
+import { PromoCodeStatus } from '@generated/prisma/enums';
 
 @Injectable()
 export class PromoCodeRepository {

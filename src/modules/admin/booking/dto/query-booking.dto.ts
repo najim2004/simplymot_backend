@@ -7,7 +7,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { BookingStatus } from 'prisma/generated/client';
+import { BookingStatus } from '@generated/prisma';
 
 export class QueryBookingDto {
   @IsOptional()

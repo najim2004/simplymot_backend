@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DayOfWeek, TimeSlotStatus } from 'prisma/generated/enums';
+import { DayOfWeek, TimeSlotStatus } from '@generated/prisma/enums';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 type SlotSource = 'DATABASE' | 'TEMPLATE';

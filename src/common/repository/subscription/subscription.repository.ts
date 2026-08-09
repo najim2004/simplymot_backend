@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { SubscriptionStatus, AuditAction } from 'prisma/generated/enums';
-import { Prisma } from 'prisma/generated/client';
+import { SubscriptionStatus, AuditAction } from '@generated/prisma/enums';
+import { Prisma } from '@generated/prisma';
 import { StripePayment } from 'src/common/lib/Payment/stripe/StripePayment';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PromoCodeRepository } from '../promo-code/promo-code.repository';

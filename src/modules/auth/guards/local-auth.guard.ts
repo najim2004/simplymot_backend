@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { UserAccountStatus } from 'prisma/generated/enums';
+import { UserAccountStatus } from '@generated/prisma/enums';
 
 @Injectable()
 export class LocalAuthGuard extends AuthGuard('local') {

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserAccountStatus, UserKind } from 'prisma/generated/enums';
+import { UserAccountStatus, UserKind } from '@generated/prisma/enums';
 import { MessageSuccessDto } from 'src/common/swagger/dto/api-response.dto';
 
 export { MessageSuccessDto };
@@ -25,23 +25,6 @@ export class MeSubscriptionSummaryDto {
 
   @ApiProperty()
   cancel_at_period_end: boolean;
-}
-
-export class MeGarageSummaryDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiPropertyOptional({ nullable: true })
-  garage_name: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  vts_number: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  contact_email: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  phone_number: string | null;
 }
 
 export class MeRolePermissionDto {
@@ -105,9 +88,6 @@ export class AuthMeUserDto {
 
   @ApiProperty({ enum: UserKind })
   kind: UserKind;
-
-  @ApiProperty({ type: [MeGarageSummaryDto] })
-  garages: MeGarageSummaryDto[];
 
   @ApiProperty({ type: String, format: 'date-time' })
   created_at: Date;

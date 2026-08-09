@@ -5,7 +5,7 @@ import { InvoiceRepository } from 'src/common/repository/invoice/invoice.reposit
 import { NotificationRepository } from 'src/common/repository/notification/notification.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionRepository } from '../../../common/repository/transaction/transaction.repository';
-import { PaymentTransactionStatus } from 'prisma/generated/enums';
+import { PaymentTransactionStatus } from '@generated/prisma/enums';
 import type Stripe from 'stripe';
 
 @Injectable()

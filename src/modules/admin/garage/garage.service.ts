@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { QueryGarageDto } from './dto/query-garage.dto';
-import { Prisma } from 'prisma/generated/client';
+import { Prisma } from '@generated/prisma';
 import { ResponseHelper } from 'src/common/helper/response.helper';
 import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
 

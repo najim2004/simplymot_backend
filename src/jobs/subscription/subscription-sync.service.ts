@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StripePayment } from 'src/common/lib/Payment/stripe/StripePayment';
-import { SubscriptionStatus } from 'prisma/generated/enums';
-import type { Prisma } from 'prisma/generated/client';
+import { SubscriptionStatus } from '@generated/prisma/enums';
+import type { Prisma } from '@generated/prisma';
 import type Stripe from 'stripe';
 import appConfig from 'src/config/app.config';
 

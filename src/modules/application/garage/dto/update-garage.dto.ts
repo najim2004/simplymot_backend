@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DayOfWeek, ServiceType } from 'prisma/generated/enums';
+import { DayOfWeek, ServiceType } from '@generated/prisma/enums';
 
 export class UpdateGarageDto {
   @ApiPropertyOptional({

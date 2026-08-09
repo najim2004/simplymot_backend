@@ -12,7 +12,7 @@ import {
   UpsertServiceDto,
 } from './dto/update-garage.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { DayOfWeek, ServiceType } from 'prisma/generated/enums';
+import { DayOfWeek, ServiceType } from '@generated/prisma/enums';
 import { ResponseHelper } from 'src/common/helper/response.helper';
 import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
 import { StringHelper } from 'src/common/helper/string.helper';
@@ -27,7 +27,7 @@ import {
   Sort,
   SortOrder,
 } from './dto/query-garage.dto';
-import { Prisma, Vehicle } from 'prisma/generated/client';
+import { Prisma, Vehicle } from '@generated/prisma';
 import { SlotRepository } from 'src/common/repository/slot/slot.repository';
 import { VehicleRepository } from 'src/common/repository/vehicle/vehicle.repository';
 import { PostCodeMapRepository } from 'src/common/repository/post-code-map/post-code-map.repository';

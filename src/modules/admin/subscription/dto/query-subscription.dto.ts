@@ -1,10 +1,10 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
-import { SubscriptionPlanStatus } from 'prisma/generated/enums';
+import { SubscriptionPlanStatus } from '@generated/prisma/enums';
 
 export class QuerySubscriptionPlanDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Page number',
     example: 1,
     default: 1,
@@ -14,7 +14,7 @@ export class QuerySubscriptionPlanDto {
   @IsNumber()
   page?: number = 1;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Limit number',
     example: 10,
     default: 10,
@@ -24,7 +24,7 @@ export class QuerySubscriptionPlanDto {
   @IsNumber()
   limit?: number = 10;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Search',
     example: 'Premium',
   })
@@ -32,7 +32,7 @@ export class QuerySubscriptionPlanDto {
   @IsString()
   search?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Status',
     example: SubscriptionPlanStatus.ACTIVE,
     enum: SubscriptionPlanStatus,

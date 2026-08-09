@@ -12,10 +12,10 @@ import appConfig from '../../../config/app.config';
 import { SojebStorage } from '../../../common/lib/Disk/SojebStorage';
 import { DateHelper } from '../../../common/helper/date.helper';
 import { StripePayment } from '../../../common/lib/Payment/stripe/StripePayment';
-import { Prisma, UserAccountStatus, UserKind } from 'prisma/generated/client';
+import { Prisma, UserAccountStatus, UserKind } from '@generated/prisma';
 import { ResponseHelper } from '../../../common/helper/response.helper';
 import { QueryUserDto } from './dto/query-user.dto';
-import { DayOfWeek } from 'prisma/generated/enums';
+import { DayOfWeek } from '@generated/prisma/enums';
 import { SubscriptionRepository } from '../../../common/repository/subscription/subscription.repository';
 
 @Injectable()

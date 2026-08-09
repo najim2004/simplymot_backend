@@ -1,4 +1,4 @@
-import { UserAccountStatus, UserKind } from 'prisma/generated/client';
+import { UserAccountStatus, UserKind } from '@generated/prisma';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';

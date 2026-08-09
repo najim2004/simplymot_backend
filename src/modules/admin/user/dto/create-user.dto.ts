@@ -8,7 +8,7 @@ import {
   IsNotEmpty,
   MinLength,
 } from 'class-validator';
-import { UserKind } from 'prisma/generated/client';
+import { UserKind } from '@generated/prisma';
 
 export class CreateUserDto {
   @ApiProperty({

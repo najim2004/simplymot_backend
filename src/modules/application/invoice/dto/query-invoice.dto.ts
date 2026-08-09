@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsEnum, IsOptional, IsString, Max, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { InvoiceKind, InvoiceStatus } from 'prisma/generated/enums';
+import { InvoiceKind, InvoiceStatus } from '@generated/prisma/enums';
 
 export class QueryInvoiceDto {
   @ApiPropertyOptional({ example: 1 })
