@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsString, IsOptional, IsDate, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsDate, IsNotEmpty, Matches } from 'class-validator';
 
 export class CreateHolidayDto {
   @ApiProperty({
@@ -23,26 +23,30 @@ export class CreateHolidayDto {
 
 export class CreateBreakTimeDto {
   @ApiProperty({
-    description: 'Break time start',
-    example: '2022-01-01',
+    description: 'Break time start in HH:mm format',
+    example: '13:00',
   })
   @IsNotEmpty()
-  @Type(() => Date)
-  @IsDate()
-  starts_at: Date;
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: 'start_time must be in HH:mm format',
+  })
+  start_time: string;
 
   @ApiProperty({
-    description: 'Break time end',
-    example: '2022-01-01',
+    description: 'Break time end in HH:mm format',
+    example: '14:00',
   })
   @IsNotEmpty()
-  @Type(() => Date)
-  @IsDate()
-  ends_at: Date;
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: 'end_time must be in HH:mm format',
+  })
+  end_time: string;
 
   @ApiProperty({
     description: 'Break time description',
-    example: 'Break time',
+    example: 'Lunch Break',
   })
   @IsOptional()
   @IsString()

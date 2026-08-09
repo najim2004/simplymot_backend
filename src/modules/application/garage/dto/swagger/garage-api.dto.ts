@@ -175,6 +175,23 @@ export class GarageServicesBundleDto {
   other_services: GarageServiceDto[];
 }
 
+export class BreakTimeDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ example: '13:00' })
+  start_time: string;
+
+  @ApiProperty({ example: '14:00' })
+  end_time: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  description: string | null;
+
+  @ApiProperty()
+  schedule_interval_id: string;
+}
+
 export class ScheduleIntervalDto {
   @ApiProperty()
   id: string;
@@ -196,6 +213,9 @@ export class ScheduleIntervalDto {
 
   @ApiPropertyOptional({ nullable: true, example: '17:00' })
   close_time: string | null;
+
+  @ApiPropertyOptional({ type: [BreakTimeDto] })
+  break_times?: BreakTimeDto[];
 }
 
 export class GarageScheduleDto {
@@ -218,20 +238,6 @@ export class DiscoverGarageDetailDto extends GarageProfileDto {
 
   @ApiProperty({ type: GarageScheduleDto })
   schedule: GarageScheduleDto;
-}
-
-export class BreakTimeDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  starts_at: Date;
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  ends_at: Date;
-
-  @ApiPropertyOptional({ nullable: true })
-  description: string | null;
 }
 
 export class HolidayDto {

@@ -57,20 +57,16 @@ export class SlotRepository {
                 buffer_time: true,
                 open_time: true,
                 close_time: true,
+                break_times: {
+                  select: {
+                    start_time: true,
+                    end_time: true,
+                    description: true,
+                  },
+                  orderBy: { start_time: 'asc' },
+                },
               },
               take: 1,
-            },
-            breakTimes: {
-              where: {
-                starts_at: { lt: dayEnd },
-                ends_at: { gt: dayStart },
-              },
-              select: {
-                starts_at: true,
-                ends_at: true,
-                description: true,
-              },
-              orderBy: { starts_at: 'asc' },
             },
             holidays: {
               where: {
@@ -110,16 +106,19 @@ export class SlotRepository {
                 day === DayOfWeek.SUNDAY
                   ? null
                   : new Date('1970-01-01T17:00:00.000Z'),
+              break_times:
+                day === DayOfWeek.SUNDAY
+                  ? undefined
+                  : {
+                      create: [
+                        {
+                          start_time: new Date('1970-01-01T13:00:00.000Z'),
+                          end_time: new Date('1970-01-01T14:00:00.000Z'),
+                          description: 'Lunch Break',
+                        },
+                      ],
+                    },
             })),
-          },
-          breakTimes: {
-            create: [
-              {
-                starts_at: new Date('1970-01-01T13:00:00.000Z'),
-                ends_at: new Date('1970-01-01T14:00:00.000Z'),
-                description: 'Lunch Break',
-              },
-            ],
           },
         },
       });
@@ -139,20 +138,16 @@ export class SlotRepository {
                   buffer_time: true,
                   open_time: true,
                   close_time: true,
+                  break_times: {
+                    select: {
+                      start_time: true,
+                      end_time: true,
+                      description: true,
+                    },
+                    orderBy: { start_time: 'asc' },
+                  },
                 },
                 take: 1,
-              },
-              breakTimes: {
-                where: {
-                  starts_at: { lt: dayEnd },
-                  ends_at: { gt: dayStart },
-                },
-                select: {
-                  starts_at: true,
-                  ends_at: true,
-                  description: true,
-                },
-                orderBy: { starts_at: 'asc' },
               },
               holidays: {
                 where: {
@@ -186,9 +181,8 @@ export class SlotRepository {
 
     const dbSlots = await this.getDatabaseSlots(garage.id, dayStart, dayEnd);
     const breakSlots = this.getBreakSlots(
-      garage.schedule.breakTimes,
+      interval?.break_times || [],
       dayStart,
-      dayEnd,
     );
     const visibleBreakSlots = breakSlots.filter(
       (breakSlot) => !dbSlots.some((slot) => this.overlaps(slot, breakSlot)),
@@ -390,21 +384,30 @@ export class SlotRepository {
   }
 
   private getBreakSlots(
-    breaks: SlotWindow[],
+    breaks: Array<{
+      start_time: Date | null;
+      end_time: Date | null;
+      description: string | null;
+    }>,
     dayStart: Date,
-    dayEnd: Date,
   ): SlotResponse[] {
-    return breaks.map((item) =>
-      this.toSlot(
-        {
-          starts_at: item.starts_at < dayStart ? dayStart : item.starts_at,
-          ends_at: item.ends_at > dayEnd ? dayEnd : item.ends_at,
-          description: item.description ?? 'Break time',
-        },
-        'TEMPLATE',
-        TimeSlotStatus.BREAK,
-      ),
-    );
+    return breaks
+      .filter((item) => Boolean(item.start_time && item.end_time))
+      .map((item) => {
+        const startMinutes = this.timeToMinutes(item.start_time);
+        const endMinutes = this.timeToMinutes(item.end_time);
+        const starts_at = this.minutesToDate(dayStart, startMinutes);
+        const ends_at = this.minutesToDate(dayStart, endMinutes);
+        return this.toSlot(
+          {
+            starts_at,
+            ends_at,
+            description: item.description ?? 'Break time',
+          },
+          'TEMPLATE',
+          TimeSlotStatus.BREAK,
+        );
+      });
   }
 
   private getTemplateSlots(params: {

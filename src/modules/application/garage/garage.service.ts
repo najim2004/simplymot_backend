@@ -537,6 +537,15 @@ export class GarageService {
             buffer_time: true,
             open_time: true,
             close_time: true,
+            break_times: {
+              select: {
+                id: true,
+                start_time: true,
+                end_time: true,
+                description: true,
+                schedule_interval_id: true,
+              },
+            },
           },
         },
       },
@@ -559,16 +568,19 @@ export class GarageService {
                 day === DayOfWeek.SUNDAY
                   ? null
                   : new Date('1970-01-01T17:00:00.000Z'),
+              break_times:
+                day === DayOfWeek.SUNDAY
+                  ? undefined
+                  : {
+                      create: [
+                        {
+                          start_time: new Date('1970-01-01T13:00:00.000Z'),
+                          end_time: new Date('1970-01-01T14:00:00.000Z'),
+                          description: 'Lunch Break',
+                        },
+                      ],
+                    },
             })),
-          },
-          breakTimes: {
-            create: [
-              {
-                starts_at: new Date('1970-01-01T13:00:00.000Z'),
-                ends_at: new Date('1970-01-01T14:00:00.000Z'),
-                description: 'Lunch Break',
-              },
-            ],
           },
         },
         select: {
@@ -583,6 +595,15 @@ export class GarageService {
               buffer_time: true,
               open_time: true,
               close_time: true,
+              break_times: {
+                select: {
+                  id: true,
+                  start_time: true,
+                  end_time: true,
+                  description: true,
+                  schedule_interval_id: true,
+                },
+              },
             },
           },
         },
@@ -593,6 +614,11 @@ export class GarageService {
         ...i,
         open_time: formatTimeHHmm(i.open_time),
         close_time: formatTimeHHmm(i.close_time),
+        break_times: (i.break_times || []).map((b) => ({
+          ...b,
+          start_time: formatTimeHHmm(b.start_time),
+          end_time: formatTimeHHmm(b.end_time),
+        })),
       }),
     );
 
@@ -658,6 +684,15 @@ export class GarageService {
       buffer_time: i.buffer_time ?? 0,
       open_time: parseTimeStringToDate(i.open_time ?? '09:00'),
       close_time: parseTimeStringToDate(i.close_time ?? '17:00'),
+      break_times: Array.isArray(i.break_times)
+        ? {
+            create: i.break_times.map((b) => ({
+              start_time: parseTimeStringToDate(b.start_time),
+              end_time: parseTimeStringToDate(b.end_time),
+              description: b.description,
+            })),
+          }
+        : undefined,
     });
 
     const schedule = await this.prisma.schedule.upsert({
@@ -668,7 +703,23 @@ export class GarageService {
           upsert: existing.map((i) => ({
             where: { id: i.id },
             update: {
-              ...i,
+              is_closed: i.is_closed,
+              slot_duration: i.slot_duration,
+              buffer_time: i.buffer_time,
+              open_time: parseTimeStringToDate(i.open_time),
+              close_time: parseTimeStringToDate(i.close_time),
+              ...(Array.isArray(i.break_times)
+                ? {
+                    break_times: {
+                      deleteMany: {},
+                      create: i.break_times.map((b) => ({
+                        start_time: parseTimeStringToDate(b.start_time),
+                        end_time: parseTimeStringToDate(b.end_time),
+                        description: b.description,
+                      })),
+                    },
+                  }
+                : {}),
             },
             create: toCreateInput(i),
           })),
@@ -685,7 +736,11 @@ export class GarageService {
       },
 
       include: {
-        schedule_intervals: true,
+        schedule_intervals: {
+          include: {
+            break_times: true,
+          },
+        },
       },
     });
     if (!schedule) {
@@ -700,7 +755,7 @@ export class GarageService {
   async createBreakTime(
     createBreakTimeDto: CreateBreakTimeDto,
     garage_id: string,
-    schedule_id: string,
+    schedule_interval_id: string,
     user_id: string,
   ) {
     const garage = await this.prisma.garage.findUnique({
@@ -712,39 +767,61 @@ export class GarageService {
     if (!garage) {
       throw new NotFoundException('Garage not found');
     }
-    const schedule = await this.prisma.schedule.findUnique({
+    const interval = await this.prisma.scheduleInterval.findFirst({
       where: {
-        id: schedule_id,
-        garage_id: garage.id,
+        id: schedule_interval_id,
+        schedule: {
+          garage_id: garage.id,
+        },
       },
     });
-    if (!schedule) {
-      throw new NotFoundException('Schedule not found');
+    if (!interval) {
+      throw new NotFoundException('Schedule interval not found');
     }
+
+    const parseTimeStringToDate = (timeStr: string): Date => {
+      if (timeStr.includes('T')) return new Date(timeStr);
+      return new Date(`1970-01-01T${timeStr}:00.000Z`);
+    };
+
+    const startTimeDate = parseTimeStringToDate(createBreakTimeDto.start_time);
+    const endTimeDate = parseTimeStringToDate(createBreakTimeDto.end_time);
+
+    if (startTimeDate.getTime() >= endTimeDate.getTime()) {
+      throw new BadRequestException('start_time must be earlier than end_time');
+    }
+
     const breakTime = await this.prisma.breakTime.create({
       data: {
-        schedule_id: schedule.id,
-        starts_at: createBreakTimeDto.starts_at,
-        ends_at: createBreakTimeDto.ends_at,
+        schedule_interval_id: interval.id,
+        start_time: startTimeDate,
+        end_time: endTimeDate,
         description: createBreakTimeDto.description,
       },
       select: {
         id: true,
-        starts_at: true,
-        ends_at: true,
+        start_time: true,
+        end_time: true,
         description: true,
+        schedule_interval_id: true,
       },
     });
-    if (!breakTime) {
-      throw new InternalServerErrorException('Break time not created');
-    }
+
     return ResponseHelper.success({
       message: 'Break time created successfully',
-      data: breakTime,
+      data: {
+        ...breakTime,
+        start_time: formatTimeHHmm(breakTime.start_time),
+        end_time: formatTimeHHmm(breakTime.end_time),
+      },
     });
   }
 
-  async getBreakTimes(garage_id: string, schedule_id: string, user_id: string) {
+  async getBreakTimes(
+    garage_id: string,
+    schedule_interval_id: string,
+    user_id: string,
+  ) {
     const garage = await this.prisma.garage.findUnique({
       where: {
         id: garage_id,
@@ -754,39 +831,47 @@ export class GarageService {
     if (!garage) {
       throw new NotFoundException('Garage not found');
     }
-    const schedule = await this.prisma.schedule.findUnique({
+    const interval = await this.prisma.scheduleInterval.findFirst({
       where: {
-        id: schedule_id,
-        garage_id: garage.id,
+        id: schedule_interval_id,
+        schedule: {
+          garage_id: garage.id,
+        },
       },
     });
-    if (!schedule) {
-      throw new NotFoundException('Schedule not found');
+    if (!interval) {
+      throw new NotFoundException('Schedule interval not found');
     }
+
     const breakTimes = await this.prisma.breakTime.findMany({
       where: {
-        schedule_id: schedule.id,
+        schedule_interval_id: interval.id,
       },
       select: {
         id: true,
-        starts_at: true,
-        ends_at: true,
+        start_time: true,
+        end_time: true,
         description: true,
+        schedule_interval_id: true,
       },
+      orderBy: { start_time: 'asc' },
     });
-    if (!breakTimes) {
-      throw new InternalServerErrorException('Break times not found');
-    }
+
+    const formatted = breakTimes.map((b) => ({
+      ...b,
+      start_time: formatTimeHHmm(b.start_time),
+      end_time: formatTimeHHmm(b.end_time),
+    }));
+
     return ResponseHelper.success({
       message: 'Break times fetched successfully',
-      data: breakTimes,
+      data: formatted,
     });
   }
 
   async deleteBreakTime(
     break_time_id: string,
     garage_id: string,
-    schedule_id: string,
     user_id: string,
   ) {
     const garage = await this.prisma.garage.findUnique({
@@ -798,33 +883,29 @@ export class GarageService {
     if (!garage) {
       throw new NotFoundException('Garage not found');
     }
-    const schedule = await this.prisma.schedule.findUnique({
-      where: {
-        id: schedule_id,
-        garage_id: garage.id,
-      },
-    });
-    if (!schedule) {
-      throw new NotFoundException('Schedule not found');
-    }
-    const breakTime = await this.prisma.breakTime.delete({
+    const breakTime = await this.prisma.breakTime.findFirst({
       where: {
         id: break_time_id,
-        schedule_id: schedule.id,
-      },
-      select: {
-        id: true,
-        starts_at: true,
-        ends_at: true,
-        description: true,
+        schedule_interval: {
+          schedule: {
+            garage_id: garage.id,
+          },
+        },
       },
     });
     if (!breakTime) {
-      throw new InternalServerErrorException('Break time not deleted');
+      throw new NotFoundException('Break time not found');
     }
+
+    await this.prisma.breakTime.delete({
+      where: { id: break_time_id },
+    });
+
     return ResponseHelper.success({
       message: 'Break time deleted successfully',
-      data: breakTime,
+      data: {
+        id: break_time_id,
+      },
     });
   }
 
@@ -1057,16 +1138,19 @@ export class GarageService {
                 day === DayOfWeek.SUNDAY
                   ? null
                   : new Date('1970-01-01T17:00:00.000Z'),
+              break_times:
+                day === DayOfWeek.SUNDAY
+                  ? undefined
+                  : {
+                      create: [
+                        {
+                          start_time: new Date('1970-01-01T13:00:00.000Z'),
+                          end_time: new Date('1970-01-01T14:00:00.000Z'),
+                          description: 'Lunch Break',
+                        },
+                      ],
+                    },
             })),
-          },
-          breakTimes: {
-            create: [
-              {
-                starts_at: new Date('1970-01-01T13:00:00.000Z'),
-                ends_at: new Date('1970-01-01T14:00:00.000Z'),
-                description: 'Lunch Break',
-              },
-            ],
           },
         },
         select: {
@@ -1080,6 +1164,14 @@ export class GarageService {
               buffer_time: true,
               open_time: true,
               close_time: true,
+              break_times: {
+                select: {
+                  id: true,
+                  start_time: true,
+                  end_time: true,
+                  description: true,
+                },
+              },
             },
           },
         },

@@ -146,23 +146,24 @@ export class GarageController {
   @apiTypedDoc(
     {
       summary: 'Create break time',
-      description: 'GARAGE + JWT. Adds a daily break window to a schedule.',
+      description:
+        'GARAGE + JWT. Adds a break window to a schedule interval. Body: `start_time` (HH:mm), `end_time` (HH:mm).',
     },
     { type: BreakTimeResponseDto },
   )
-  @Post(':garage_id/schedule/:schedule_id/break_times')
+  @Post(':garage_id/schedule_interval/:schedule_interval_id/break_times')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.GARAGE)
   createBreakTime(
     @Param('garage_id') garage_id: string,
-    @Param('schedule_id') schedule_id: string,
+    @Param('schedule_interval_id') schedule_interval_id: string,
     @Body() createBreakTimeDto: CreateBreakTimeDto,
     @User('id') user_id: string,
   ) {
     return this.garageService.createBreakTime(
       createBreakTimeDto,
       garage_id,
-      schedule_id,
+      schedule_interval_id,
       user_id,
     );
   }
@@ -170,41 +171,43 @@ export class GarageController {
   @apiTypedDoc(
     {
       summary: 'List break times',
-      description: 'GARAGE + JWT. Lists breaks for a schedule.',
+      description: 'GARAGE + JWT. Lists breaks for a schedule interval.',
     },
     { type: BreakTimesListResponseDto },
   )
-  @Get(':garage_id/schedule/:schedule_id/break_times')
+  @Get(':garage_id/schedule_interval/:schedule_interval_id/break_times')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.GARAGE)
   getBreakTimes(
     @Param('garage_id') garage_id: string,
-    @Param('schedule_id') schedule_id: string,
+    @Param('schedule_interval_id') schedule_interval_id: string,
     @User('id') user_id: string,
   ) {
-    return this.garageService.getBreakTimes(garage_id, schedule_id, user_id);
+    return this.garageService.getBreakTimes(
+      garage_id,
+      schedule_interval_id,
+      user_id,
+    );
   }
 
   @apiTypedDoc(
     {
       summary: 'Delete break time',
-      description: 'GARAGE + JWT. Removes a break from schedule.',
+      description: 'GARAGE + JWT. Removes a break from schedule interval.',
     },
     { type: BreakTimeResponseDto },
   )
-  @Delete(':garage_id/schedule/:schedule_id/break_times/:break_time_id')
+  @Delete(':garage_id/break_times/:break_time_id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.GARAGE)
   deleteBreakTime(
     @Param('garage_id') garage_id: string,
-    @Param('schedule_id') schedule_id: string,
     @Param('break_time_id') break_time_id: string,
     @User('id') user_id: string,
   ) {
     return this.garageService.deleteBreakTime(
       break_time_id,
       garage_id,
-      schedule_id,
       user_id,
     );
   }

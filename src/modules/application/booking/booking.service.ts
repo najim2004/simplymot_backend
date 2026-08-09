@@ -84,16 +84,19 @@ export class BookingService {
                 day === DayOfWeek.SUNDAY
                   ? null
                   : new Date('1970-01-01T17:00:00.000Z'),
+              break_times:
+                day === DayOfWeek.SUNDAY
+                  ? undefined
+                  : {
+                      create: [
+                        {
+                          start_time: new Date('1970-01-01T13:00:00.000Z'),
+                          end_time: new Date('1970-01-01T14:00:00.000Z'),
+                          description: 'Lunch Break',
+                        },
+                      ],
+                    },
             })),
-          },
-          breakTimes: {
-            create: [
-              {
-                starts_at: new Date('1970-01-01T13:00:00.000Z'),
-                ends_at: new Date('1970-01-01T14:00:00.000Z'),
-                description: 'Lunch Break',
-              },
-            ],
           },
         },
       });

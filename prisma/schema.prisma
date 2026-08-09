@@ -280,7 +280,6 @@ model Schedule {
 
   // Relations
   holidays           Holiday[]
-  breakTimes         BreakTime[]
   timeSlots          TimeSlot[]
   garage             Garage             @relation(fields: [garage_id], references: [id], onDelete: Cascade)
   schedule_intervals ScheduleInterval[]
@@ -302,27 +301,27 @@ model ScheduleInterval {
   schedule_id   String
   schedule      Schedule  @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
 
+  break_times BreakTime[]
+
   @@unique([schedule_id, day_of_week])
   @@index([schedule_id])
   @@map("schedule_intervals")
 }
 
-/// Calendar-specific break window (UTC-aware). For repeating lunch hours, prefer template rows or `ScheduleInterval`.
 model BreakTime {
   id         String   @id @default(cuid())
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  starts_at DateTime @db.Timestamptz(6)
-  ends_at   DateTime @db.Timestamptz(6)
+  start_time DateTime? @db.Time(6)
+  end_time   DateTime? @db.Time(6)
 
   description String?
 
-  schedule_id String
-  schedule    Schedule @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+  schedule_interval_id String
+  schedule_interval    ScheduleInterval @relation(fields: [schedule_interval_id], references: [id], onDelete: Cascade)
 
-  @@index([schedule_id])
-  @@index([starts_at, ends_at])
+  @@index([schedule_interval_id])
   @@map("break_times")
 }
 

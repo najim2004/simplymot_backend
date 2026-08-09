@@ -12,6 +12,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DayOfWeek, ServiceType } from '@generated/prisma/enums';
+import { CreateBreakTimeDto } from './create-garage.dto';
 
 export class UpdateGarageDto {
   @ApiPropertyOptional({
@@ -233,6 +234,16 @@ export class ScheduleIntervalDto {
   @IsString()
   @IsOptional()
   close_time?: string;
+
+  @ApiProperty({
+    description: 'Break times for this schedule interval',
+    type: [CreateBreakTimeDto],
+  })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => CreateBreakTimeDto)
+  break_times?: CreateBreakTimeDto[];
 }
 
 export class UpsertScheduleDto {
