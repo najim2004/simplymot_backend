@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { User } from 'src/modules/auth/decorators/get-user.decorator';
 import { QueryInvoiceDto } from './dto/query-invoice.dto';
 import { InvoiceService } from './invoice.service';
@@ -8,9 +8,15 @@ import {
   GetInvoiceResponseDto,
   ListInvoicesResponseDto,
 } from './dto/swagger/invoice-api.dto';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guard/role/roles.guard';
+import { Roles } from 'src/common/guard/role/roles.decorator';
+import { Role } from 'src/common/guard/role/role.enum';
 
 @ApiTags('Invoice')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.GARAGE)
 @Controller('invoice')
 export class InvoiceController {
   constructor(private readonly invoiceService: InvoiceService) {}
