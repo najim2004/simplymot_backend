@@ -255,6 +255,7 @@ export class GarageService {
         phone_number: true,
         address: true,
         garage_image: true,
+        post_code: true,
         services: {
           where: {
             OR: [{ type: ServiceType.MOT }, { vehicle_class: 'Class 4' }],
@@ -280,6 +281,7 @@ export class GarageService {
         ? SojebStorage.url(garage?.garage_image)
         : null,
       mot_price: garage.services?.[0]?.price ?? null,
+      post_code: garage.post_code,
     };
     return ResponseHelper.success({
       message: 'Garage fetched successfully',

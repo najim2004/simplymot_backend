@@ -28,6 +28,9 @@ export class GarageProfileDto {
 
   @ApiPropertyOptional({ nullable: true })
   mot_price: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  post_code: string | null;
 }
 
 export class DiscoverVehicleDto {
