@@ -96,4 +96,27 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   additional_services?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Vehicle ID (must belong to the authenticated user). ' +
+      'If omitted, vehicle_registration_number is used to find or create the vehicle.',
+    example: 'clx1234567890abcdef',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  vehicle_id?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Vehicle registration number. Used when vehicle_id is not provided. ' +
+      'The system will find the vehicle in the database and link it to the user, ' +
+      'or create a new entry if it does not exist yet.',
+    example: 'AB12CDE',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  vehicle_registration_number?: string;
 }

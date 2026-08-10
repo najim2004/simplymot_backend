@@ -22,6 +22,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SlotRepository } from 'src/common/repository/slot/slot.repository';
 import { SubscriptionRepository } from 'src/common/repository/subscription/subscription.repository';
+import { VehicleRepository } from 'src/common/repository/vehicle/vehicle.repository';
 import { ResponseHelper } from 'src/common/helper/response.helper';
 import { SojebStorage } from 'src/common/lib/Disk/SojebStorage';
 
@@ -31,6 +32,7 @@ export class BookingService {
     private readonly prisma: PrismaService,
     private readonly slotRepository: SlotRepository,
     private readonly subscriptionRepository: SubscriptionRepository,
+    private readonly vehicleRepository: VehicleRepository,
   ) {}
 
   async create(createBookingDto: CreateBookingDto, user_id: string) {
@@ -177,6 +179,85 @@ export class BookingService {
       existingSlotId = matchedSlot.id ?? null;
     }
 
+    // ── Resolve vehicle ────────────────────────────────────────────────────
+    let resolvedVehicleId: string | null = null;
+
+    if (createBookingDto.vehicle_id) {
+      // vehicle_id provided → validate that it belongs to the booking user
+      const vehicle = await this.prisma.vehicle.findFirst({
+        where: {
+          id: createBookingDto.vehicle_id,
+          user_id: user_id,
+        },
+        select: { id: true },
+      });
+
+      if (!vehicle) {
+        throw new NotFoundException(
+          'Vehicle not found or does not belong to the current user',
+        );
+      }
+
+      resolvedVehicleId = vehicle.id;
+    } else if (createBookingDto.vehicle_registration_number) {
+      // registration number provided → find-or-create, same logic as VehicleService.addVehicle
+      const normalized = createBookingDto.vehicle_registration_number
+        .replace(/\s/g, '')
+        .toUpperCase();
+
+      const existingVehicle = await this.prisma.vehicle.findFirst({
+        where: { registration_number: normalized },
+        select: { id: true, user_id: true, mot_last_checked_at: true },
+      });
+
+      if (existingVehicle) {
+        if (existingVehicle.user_id && existingVehicle.user_id !== user_id) {
+          // Vehicle already belongs to a different user — still allow booking
+          // but do NOT re-link. Use the existing vehicle record.
+          resolvedVehicleId = existingVehicle.id;
+        } else if (!existingVehicle.user_id) {
+          // Unowned vehicle — claim it for the current user
+          const updated = await this.prisma.vehicle.update({
+            where: { id: existingVehicle.id },
+            data: { user_id: user_id },
+          });
+          if (
+            this.vehicleRepository.shouldRefreshMotData(
+              existingVehicle.mot_last_checked_at,
+            )
+          ) {
+            await this.vehicleRepository
+              .refreshVehicleDataFromDvla(updated)
+              .catch(() => {
+                /* best-effort, don't block booking */
+              });
+          }
+          resolvedVehicleId = updated.id;
+        } else {
+          // existingVehicle.user_id === user_id  → already owned
+          resolvedVehicleId = existingVehicle.id;
+        }
+      } else {
+        // Vehicle not in DB → create it and fetch DVLA data
+        const newVehicle = await this.prisma.vehicle.create({
+          data: {
+            registration_number: normalized,
+            user_id: user_id,
+          },
+        });
+        await this.vehicleRepository
+          .refreshVehicleDataFromDvla(newVehicle)
+          .catch(async () => {
+            // If DVLA fetch fails, still keep the vehicle (don't delete) — booking should proceed
+          });
+      }
+    }
+
+    if (!resolvedVehicleId) {
+      throw new BadRequestException('Vehicle not found');
+    }
+    // ── End vehicle resolution ─────────────────────────────────────────────
+
     const booking = await this.prisma.$transaction(async (tx) => {
       let slotId: string;
 
@@ -271,6 +352,7 @@ export class BookingService {
         data: {
           customer_id: user_id,
           garage_id: createBookingDto.garage_id,
+          vehicle_id: resolvedVehicleId,
           slot_id: slotId,
           order_date: startsAt,
           status: BookingStatus.PENDING,
@@ -278,12 +360,7 @@ export class BookingService {
         },
         select: {
           id: true,
-          garage_id: true,
-          slot_id: true,
-          order_date: true,
-          status: true,
           additional_services: true,
-          created_at: true,
         },
       });
 
@@ -307,12 +384,65 @@ export class BookingService {
         },
       });
 
-      return createdBooking;
+      return createdBooking.id;
     });
+
+    // Fetch only the data the frontend needs for the success modal
+    const bookingData = await this.prisma.booking.findUnique({
+      where: { id: booking },
+      select: {
+        id: true,
+        additional_services: true,
+        garage: {
+          select: {
+            garage_name: true,
+            address: true,
+            post_code: true,
+            contact_email: true,
+            phone_number: true,
+          },
+        },
+        slot: {
+          select: {
+            starts_at: true,
+            ends_at: true,
+          },
+        },
+        vehicle: {
+          select: {
+            registration_number: true,
+          },
+        },
+      },
+    });
+
+    const garageAddress = [
+      bookingData?.garage?.address,
+      bookingData?.garage?.post_code,
+    ]
+      .filter(Boolean)
+      .join(', ');
 
     return ResponseHelper.success({
       message: 'Booking created successfully',
-      data: booking,
+      data: {
+        id: bookingData?.id,
+        order_id: bookingData?.id,
+        additional_services: bookingData?.additional_services,
+        garage: {
+          garage_name: bookingData?.garage?.garage_name,
+          address: garageAddress || null,
+          email: bookingData?.garage?.contact_email,
+          phone_number: bookingData?.garage?.phone_number,
+        },
+        slot: {
+          starts_at: bookingData?.slot?.starts_at,
+          ends_at: bookingData?.slot?.ends_at,
+        },
+        vehicle: {
+          registration_number: bookingData?.vehicle?.registration_number,
+        },
+      },
     });
   }
 

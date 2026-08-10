@@ -1,28 +1,53 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationMetaDto } from 'src/common/swagger/dto/api-response.dto';
 
+export class BookingCreatedGarageDto {
+  @ApiPropertyOptional({ nullable: true })
+  garage_name: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  address: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  email: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  phone_number: string | null;
+}
+
+export class BookingCreatedSlotDto {
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  starts_at: Date | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  ends_at: Date | null;
+}
+
+export class BookingCreatedVehicleDto {
+  @ApiPropertyOptional({ nullable: true })
+  registration_number: string | null;
+}
+
 export class BookingCreatedDto {
   @ApiProperty()
   id: string;
 
   @ApiProperty()
-  garage_id: string;
+  order_id: string;
 
   @ApiPropertyOptional({ nullable: true })
-  slot_id: string | null;
+  additional_services: string | null;
 
-  @ApiProperty({ type: String, format: 'date-time' })
-  order_date: Date;
+  @ApiProperty({ type: () => BookingCreatedGarageDto })
+  garage: BookingCreatedGarageDto;
 
-  @ApiProperty({ example: 'PENDING' })
-  status: string;
+  @ApiProperty({ type: () => BookingCreatedSlotDto })
+  slot: BookingCreatedSlotDto;
 
-  @ApiPropertyOptional({ type: [String] })
-  additional_services?: string[];
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  created_at: Date;
+  @ApiPropertyOptional({ type: () => BookingCreatedVehicleDto, nullable: true })
+  vehicle: BookingCreatedVehicleDto | null;
 }
+
 
 export class BookingListCustomerDto {
   @ApiPropertyOptional({ nullable: true })
