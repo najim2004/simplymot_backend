@@ -212,9 +212,9 @@ export class BookingService {
 
       if (existingVehicle) {
         if (existingVehicle.user_id && existingVehicle.user_id !== user_id) {
-          // Vehicle already belongs to a different user — still allow booking
-          // but do NOT re-link. Use the existing vehicle record.
-          resolvedVehicleId = existingVehicle.id;
+          throw new ConflictException(
+            `This vehicle (${normalized}) is already registered to another user account.`,
+          );
         } else if (!existingVehicle.user_id) {
           // Unowned vehicle — claim it for the current user
           const updated = await this.prisma.vehicle.update({
