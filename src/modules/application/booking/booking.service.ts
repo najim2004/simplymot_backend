@@ -507,6 +507,18 @@ export class BookingService {
       where.status = query.status;
     }
 
+    if (query.search) {
+      const term = query.search.trim();
+      where.OR = [
+        { customer: { name: { contains: term, mode: 'insensitive' } } },
+        { customer: { email: { contains: term, mode: 'insensitive' } } },
+        { customer: { phone_number: { contains: term, mode: 'insensitive' } } },
+        { vehicle: { registration_number: { contains: term, mode: 'insensitive' } } },
+        { vehicle: { make: { contains: term, mode: 'insensitive' } } },
+        { vehicle: { model: { contains: term, mode: 'insensitive' } } },
+      ];
+    }
+
     const [rows, total] = await Promise.all([
       this.prisma.booking.findMany({
         where,
@@ -604,6 +616,7 @@ export class BookingService {
           from_date: query.from_date ?? null,
           to_date: query.to_date ?? null,
           status: query.status ?? null,
+          search: query.search ?? null,
         },
       },
     });

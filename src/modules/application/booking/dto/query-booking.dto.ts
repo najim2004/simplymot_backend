@@ -12,6 +12,11 @@ import {
 import { BookingStatus } from '@generated/prisma/enums';
 
 export class QueryBookingDto {
+  @ApiPropertyOptional({ example: 'John' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @ApiPropertyOptional({ example: 'clx1234567890abcdef' })
   @IsOptional()
   @IsString()

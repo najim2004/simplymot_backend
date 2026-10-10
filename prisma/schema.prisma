@@ -202,7 +202,7 @@ model User {
   billing_id String?
 
   /// Discriminator: end-user vs garage operator vs admin (DB column: type).
-  kind UserKind @default(USER) @map("type")
+  kind UserKind @default(USER)
 
   accounts Account[]
 
@@ -841,6 +841,7 @@ model BookingItem {
 
   @@index([booking_id])
   @@index([service_id])
+  @@map("booking_items")
 }
 
 model Invoice {
@@ -982,8 +983,8 @@ model Contact {
   message         String?
   source          String?
 
-  first_name   String?
-  last_name    String?
+  first_name String?
+  last_name  String?
 
   @@index([user_id])
   @@index([email])
