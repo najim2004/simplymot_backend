@@ -99,6 +99,8 @@ enum PromoCodeStatus {
 }
 
 enum BookingStatus {
+  BOOKED
+  RESCHEDULED
   PENDING
   ACCEPTED
   REJECTED
@@ -797,7 +799,7 @@ model Booking {
   customer_id         String?
   slot_id             String?       @unique
   additional_services String? // Free-text note from driver
-  status              BookingStatus @default(PENDING)
+  status              BookingStatus @default(BOOKED)
 
   vehicle_id    String?
   garage_id     String?

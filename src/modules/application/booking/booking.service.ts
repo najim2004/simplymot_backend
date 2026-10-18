@@ -355,11 +355,14 @@ export class BookingService {
           vehicle_id: resolvedVehicleId,
           slot_id: slotId,
           order_date: startsAt,
-          status: BookingStatus.PENDING,
+          status: BookingStatus.BOOKED,
           additional_services: createBookingDto.additional_services ?? null,
         },
         select: {
           id: true,
+          status: true,
+          slot_id: true,
+          order_date: true,
           additional_services: true,
         },
       });
@@ -377,7 +380,15 @@ export class BookingService {
           actor_id: user_id,
           actor_type: 'user',
           garage_id: createBookingDto.garage_id,
-          new_values: createdBooking as any,
+          new_values: {
+            id: createdBooking.id,
+            status: createdBooking.status,
+            slot_id: createdBooking.slot_id,
+            order_date: createdBooking.order_date,
+            slot_starts_at: startsAt,
+            slot_ends_at: endsAt,
+            additional_services: createdBooking.additional_services,
+          },
           metadata: {
             created_by: 'DRIVER',
           },
@@ -837,6 +848,7 @@ export class BookingService {
       select: {
         id: true,
         status: true,
+        order_date: true,
         customer_id: true,
         garage_id: true,
         slot_id: true,
@@ -850,6 +862,7 @@ export class BookingService {
         slot: {
           select: {
             id: true,
+            starts_at: true,
             ends_at: true,
           },
         },
@@ -860,9 +873,14 @@ export class BookingService {
       throw new NotFoundException('Booking not found');
     }
 
-    if (booking.garage?.owner_id !== user_id) {
+    const isGarageOwner = booking.garage?.owner_id === user_id;
+    const isCustomer = booking.customer_id === user_id;
+
+    if (!isGarageOwner && !isCustomer) {
       throw new ForbiddenException('You do not have access to this booking');
     }
+
+    const rescheduledBy = isGarageOwner ? 'GARAGE' : 'DRIVER';
 
     if (
       booking.status === BookingStatus.CANCELLED ||
@@ -1046,11 +1064,27 @@ export class BookingService {
         }
       }
 
+      if (booking.slot_id && booking.slot_id !== newSlotId) {
+        if (booking.slot?.ends_at && booking.slot.ends_at <= new Date()) {
+          await tx.timeSlot.delete({ where: { id: booking.slot_id } });
+        } else {
+          await tx.timeSlot.update({
+            where: { id: booking.slot_id },
+            data: {
+              status: TimeSlotStatus.AVAILABLE,
+              booking_id: null,
+              customer_id: null,
+            },
+          });
+        }
+      }
+
       const updated = await tx.booking.update({
         where: { id: booking.id },
         data: {
           slot_id: newSlotId,
           order_date: startsAt,
+          status: BookingStatus.RESCHEDULED,
         },
         select: {
           id: true,
@@ -1067,20 +1101,12 @@ export class BookingService {
         data: { booking_id: updated.id },
       });
 
-      if (booking.slot_id && booking.slot_id !== newSlotId) {
-        if (booking.slot?.ends_at && booking.slot.ends_at <= new Date()) {
-          await tx.timeSlot.delete({ where: { id: booking.slot_id } });
-        } else {
-          await tx.timeSlot.update({
-            where: { id: booking.slot_id },
-            data: {
-              status: TimeSlotStatus.AVAILABLE,
-              booking_id: null,
-              customer_id: null,
-            },
-          });
-        }
-      }
+      const wasPastSlotDeleted = Boolean(
+        booking.slot_id &&
+          booking.slot_id !== newSlotId &&
+          booking.slot?.ends_at &&
+          booking.slot.ends_at <= new Date(),
+      );
 
       await tx.auditLog.create({
         data: {
@@ -1088,19 +1114,30 @@ export class BookingService {
           record_id: booking.id,
           action: AuditAction.UPDATE,
           actor_id: user_id,
-          actor_type: 'user',
+          actor_type: isGarageOwner ? 'garage' : 'user',
           garage_id: booking.garage_id,
           old_values: {
+            status: booking.status,
             slot_id: booking.slot_id,
-            order_date: booking.slot?.ends_at,
+            order_date: booking.order_date,
+            slot_starts_at: booking.slot?.starts_at,
+            slot_ends_at: booking.slot?.ends_at,
           },
           new_values: {
+            status: BookingStatus.RESCHEDULED,
             slot_id: newSlotId,
             order_date: startsAt,
+            slot_starts_at: startsAt,
+            slot_ends_at: endsAt,
           },
           metadata: {
-            rescheduled_by: 'GARAGE',
-            reason: rescheduleBookingDto.reason ?? null,
+            rescheduled_by: rescheduledBy,
+            reason:
+              rescheduleBookingDto.reason ||
+              (isGarageOwner
+                ? 'reschedule from garage'
+                : 'reschedule by customer'),
+            previous_slot_deleted: wasPastSlotDeleted,
           },
         },
       });
@@ -1133,6 +1170,7 @@ export class BookingService {
       select: {
         id: true,
         status: true,
+        order_date: true,
         customer_id: true,
         garage_id: true,
         slot_id: true,
@@ -1144,6 +1182,7 @@ export class BookingService {
         slot: {
           select: {
             id: true,
+            starts_at: true,
             ends_at: true,
           },
         },
@@ -1207,27 +1246,38 @@ export class BookingService {
         }
       }
 
+      const wasPastSlotDeleted = Boolean(
+        booking.slot_id &&
+          booking.slot?.ends_at &&
+          booking.slot.ends_at <= new Date(),
+      );
+
       await tx.auditLog.create({
         data: {
           table_name: 'Booking',
           record_id: booking.id,
           action: AuditAction.CANCELLATION,
           actor_id: user_id,
-          actor_type: 'user',
+          actor_type: isGarageOwner ? 'garage' : 'user',
           garage_id: booking.garage_id,
           old_values: {
             status: booking.status,
-            cancel_reason: null,
-            cancelled_by: null,
+            slot_id: booking.slot_id,
+            order_date: booking.order_date,
+            slot_starts_at: booking.slot?.starts_at,
+            slot_ends_at: booking.slot?.ends_at,
           },
           new_values: {
             status: BookingStatus.CANCELLED,
-            cancel_reason: cancelBookingDto.reason,
-            cancelled_by: cancelledBy,
+            slot_id: null,
+            order_date: booking.order_date,
+            slot_starts_at: null,
+            slot_ends_at: null,
           },
           metadata: {
             cancelled_by: cancelledBy,
-            reason: cancelBookingDto.reason,
+            cancel_reason: cancelBookingDto.reason,
+            slot_deleted: wasPastSlotDeleted,
           },
         },
       });
