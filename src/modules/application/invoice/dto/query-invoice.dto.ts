@@ -31,4 +31,14 @@ export class QueryInvoiceDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ example: '2026-01-01' })
+  @IsOptional()
+  @Type(() => Date)
+  from_date?: Date;
+
+  @ApiPropertyOptional({ example: '2026-01-31' })
+  @IsOptional()
+  @Type(() => Date)
+  to_date?: Date;
 }

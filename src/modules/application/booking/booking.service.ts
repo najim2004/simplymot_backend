@@ -527,6 +527,9 @@ export class BookingService {
         { vehicle: { registration_number: { contains: term, mode: 'insensitive' } } },
         { vehicle: { make: { contains: term, mode: 'insensitive' } } },
         { vehicle: { model: { contains: term, mode: 'insensitive' } } },
+        { garage: { garage_name: { contains: term, mode: 'insensitive' } } },
+        { garage: { contact_email: { contains: term, mode: 'insensitive' } } },
+        { garage: { phone_number: { contains: term, mode: 'insensitive' } } },
       ];
     }
 
@@ -556,11 +559,14 @@ export class BookingService {
               model: true,
             },
           },
+          garage_id: true,
           garage: {
             select: {
+              id: true,
               garage_name: true,
               contact_email: true,
               phone_number: true,
+              address: true,
               garage_image: true,
             },
           },
@@ -596,11 +602,14 @@ export class BookingService {
               : null,
           }
         : null,
+      garage_id: booking.garage_id,
       garage: booking.garage
         ? {
+            id: booking.garage.id,
             name: booking.garage.garage_name,
             email: booking.garage.contact_email,
             phone_number: booking.garage.phone_number,
+            address: booking.garage.address,
             image: booking.garage.garage_image
               ? SojebStorage.url(booking.garage.garage_image)
               : null,

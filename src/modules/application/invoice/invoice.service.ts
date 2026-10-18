@@ -25,6 +25,20 @@ export class InvoiceService {
               },
             }
           : {},
+        query.from_date || query.to_date
+          ? {
+              created_at: {
+                ...(query.from_date && { gte: new Date(query.from_date) }),
+                ...(query.to_date && {
+                  lte: (() => {
+                    const d = new Date(query.to_date);
+                    d.setHours(23, 59, 59, 999);
+                    return d;
+                  })(),
+                }),
+              },
+            }
+          : {},
       ],
     };
 
