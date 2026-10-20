@@ -792,6 +792,9 @@ model PriceMigrationJobAttempt {
 
 model Booking {
   id         String   @id @default(cuid())
+  /// Human-readable, memorable booking number (e.g. SM-000123).
+  /// Generated at booking creation time from the sequential booking count.
+  booking_number String? @unique
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
   order_date DateTime

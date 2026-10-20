@@ -35,6 +35,38 @@ export class BookingService {
     private readonly vehicleRepository: VehicleRepository,
   ) {}
 
+  /**
+   * Generates a human-readable, memorable booking number (e.g. SM-000123).
+   * The sequence is derived from the total booking count at creation time.
+   * On the rare collision (concurrent inserts), it retries with the next
+   * sequence number until a free number is found.
+   */
+  private async generateBookingNumber(
+    tx: Prisma.TransactionClient,
+  ): Promise<string> {
+    const PREFIX = 'SM';
+    const total = await tx.booking.count();
+    let sequence = total + 1;
+
+    // Max 10 attempts to keep it safe against concurrent booking creation.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const candidate = `${PREFIX}-${String(sequence).padStart(6, '0')}`;
+      const exists = await tx.booking.findUnique({
+        where: { booking_number: candidate },
+        select: { id: true },
+      });
+
+      if (!exists) {
+        return candidate;
+      }
+
+      sequence += 1;
+    }
+
+    // Extremely unlikely fallback: still guarantee uniqueness.
+    return `${PREFIX}-${Date.now().toString().slice(-6)}`;
+  }
+
   async create(createBookingDto: CreateBookingDto, user_id: string) {
     const garage = await this.prisma.garage.findUnique({
       where: { id: createBookingDto.garage_id },
@@ -348,6 +380,10 @@ export class BookingService {
         }
       }
 
+      // Human-readable, memorable booking number (e.g. SM-000123),
+      // generated from the sequential booking count at creation time.
+      const booking_number = await this.generateBookingNumber(tx);
+
       const createdBooking = await tx.booking.create({
         data: {
           customer_id: user_id,
@@ -356,10 +392,12 @@ export class BookingService {
           slot_id: slotId,
           order_date: startsAt,
           status: BookingStatus.BOOKED,
+          booking_number,
           additional_services: createBookingDto.additional_services ?? null,
         },
         select: {
           id: true,
+          booking_number: true,
           status: true,
           slot_id: true,
           order_date: true,
@@ -403,6 +441,7 @@ export class BookingService {
       where: { id: booking },
       select: {
         id: true,
+        booking_number: true,
         additional_services: true,
         garage: {
           select: {
@@ -438,6 +477,7 @@ export class BookingService {
       message: 'Booking created successfully',
       data: {
         id: bookingData?.id,
+        booking_number: bookingData?.booking_number ?? null,
         order_id: bookingData?.id,
         additional_services: bookingData?.additional_services,
         garage: {
@@ -538,6 +578,7 @@ export class BookingService {
         where,
         select: {
           id: true,
+          booking_number: true,
           status: true,
           order_date: true,
           slot: {
@@ -586,12 +627,17 @@ export class BookingService {
       this.prisma.booking.count({ where }),
     ]);
 
+    const isGarage = user.kind === UserKind.GARAGE;
+
     const bookings = rows.map((booking) => ({
       id: booking.id,
+      booking_number: booking.booking_number,
       status: booking.status,
       starts_at: booking.slot?.starts_at ?? booking.order_date,
       ends_at: booking.slot?.ends_at ?? null,
-      service_price: booking.items[0]?.unit_price ?? null,
+      // Garages don't handle payments for these bookings, so they
+      // never receive price details.
+      service_price: isGarage ? null : (booking.items[0]?.unit_price ?? null),
       customer: booking.customer
         ? {
             name: booking.customer.name,
@@ -656,6 +702,7 @@ export class BookingService {
       where: { id: booking_id },
       select: {
         id: true,
+        booking_number: true,
         created_at: true,
         updated_at: true,
         order_date: true,
@@ -782,8 +829,45 @@ export class BookingService {
         }
       : null;
 
+    const auditLogs = await this.prisma.auditLog.findMany({
+      where: {
+        table_name: 'Booking',
+        record_id: booking.id,
+      },
+      orderBy: { created_at: 'asc' },
+      select: {
+        id: true,
+        action: true,
+        actor_type: true,
+        created_at: true,
+        old_values: true,
+        new_values: true,
+      },
+    });
+
+    const logs = auditLogs.map((log) => {
+      const newVals = (log.new_values as Record<string, any>) || {};
+      const oldVals = (log.old_values as Record<string, any>) || {};
+      return {
+        id: log.id,
+        action: log.action,
+        actor_type: log.actor_type,
+        created_at: log.created_at,
+        details: {
+          status: newVals.status || null,
+          slot_starts_at: newVals.slot_starts_at || null,
+          slot_ends_at: newVals.slot_ends_at || null,
+          previous_slot_starts_at: oldVals.slot_starts_at || null,
+          previous_slot_ends_at: oldVals.slot_ends_at || null,
+          cancel_reason: newVals.cancel_reason || null,
+          cancelled_by: newVals.cancelled_by || null,
+        },
+      };
+    });
+
     const baseBooking = {
       id: booking.id,
+      booking_number: booking.booking_number,
       created_at: booking.created_at,
       updated_at: booking.updated_at,
       order_date: booking.order_date,
@@ -799,19 +883,68 @@ export class BookingService {
       slot: booking.slot,
       vehicle,
       items: booking.items,
+      logs,
     };
 
     if (user.kind === UserKind.GARAGE) {
+      // Customer booking stats: how many bookings they made & cancelled.
+      let totalBooked: number | null = null;
+      let totalCancelled: number | null = null;
+
+      if (booking.customer_id) {
+        const [bookedCount, cancelledCount] = await Promise.all([
+          this.prisma.booking.count({
+            where: { customer_id: booking.customer_id },
+          }),
+          this.prisma.booking.count({
+            where: {
+              customer_id: booking.customer_id,
+              status: BookingStatus.CANCELLED,
+            },
+          }),
+        ]);
+        totalBooked = bookedCount;
+        totalCancelled = cancelledCount;
+      }
+
+      // Only the vehicle data a garage actually needs for the job.
+      const garageVehicle = booking.vehicle
+        ? {
+            registration_number: booking.vehicle.registration_number,
+            make: booking.vehicle.make,
+            model: booking.vehicle.model,
+            color: booking.vehicle.color,
+            fuel_type: booking.vehicle.fuel_type,
+            engine_capacity: booking.vehicle.engine_capacity,
+            year_of_manufacture: booking.vehicle.year_of_manufacture,
+            mot_status: booking.vehicle.mot_status,
+            mot_expiry_date: booking.vehicle.mot_expiry_date,
+            last_mot_test_date: lastMot?.test_date ?? null,
+            last_mot_expiry_date: lastMot?.expiry_date ?? null,
+            last_mot_status: lastMot?.status ?? null,
+          }
+        : null;
+
       return ResponseHelper.success({
         message: 'Booking fetched successfully',
         data: {
           ...baseBooking,
+          // Garages don't handle payments here, and shouldn't see
+          // price details or the customer's home address.
+          total_amount: undefined,
+          items: undefined,
+          vehicle: garageVehicle,
           customer: booking.customer
             ? {
-                ...booking.customer,
+                id: booking.customer.id,
+                name: booking.customer.name,
+                email: booking.customer.email,
+                phone_number: booking.customer.phone_number,
                 avatar: booking.customer.avatar
                   ? SojebStorage.url(booking.customer.avatar)
                   : null,
+                total_booked: totalBooked,
+                total_cancelled: totalCancelled,
               }
             : null,
         },
