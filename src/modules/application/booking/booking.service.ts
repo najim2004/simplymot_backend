@@ -18,6 +18,7 @@ import { QueryBookingDto } from './dto/query-booking.dto';
 import {
   CancelBookingDto,
   RescheduleBookingDto,
+  UpdateBookingNoteDto,
 } from './dto/update-booking.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SlotRepository } from 'src/common/repository/slot/slot.repository';
@@ -713,6 +714,7 @@ export class BookingService {
         slot_id: true,
         total_amount: true,
         additional_services: true,
+        garage_note: true,
         cancel_reason: true,
         cancelled_by: true,
         slot: {
@@ -878,6 +880,7 @@ export class BookingService {
       slot_id: booking.slot_id,
       total_amount: booking.total_amount,
       additional_services: booking.additional_services,
+      garage_note: booking.garage_note,
       cancel_reason: booking.cancel_reason,
       cancelled_by: booking.cancelled_by,
       slot: booking.slot,
@@ -887,24 +890,45 @@ export class BookingService {
     };
 
     if (user.kind === UserKind.GARAGE) {
-      // Customer booking stats: how many bookings they made & cancelled.
-      let totalBooked: number | null = null;
-      let totalCancelled: number | null = null;
+      // Customer Merit Score (0 - 100)
+      // Garage cancellations must NEVER reduce customer's merit score!
+      let meritScore = 100;
 
       if (booking.customer_id) {
-        const [bookedCount, cancelledCount] = await Promise.all([
+        const [completedCount, customerCancelledCount] = await Promise.all([
           this.prisma.booking.count({
-            where: { customer_id: booking.customer_id },
+            where: {
+              customer_id: booking.customer_id,
+              status: BookingStatus.COMPLETED,
+            },
           }),
           this.prisma.booking.count({
             where: {
               customer_id: booking.customer_id,
               status: BookingStatus.CANCELLED,
+              // Only cancellations where cancelled_by is DRIVER count against customer.
+              // Cancellations by GARAGE are excluded so customer merit is never lowered by garage action.
+              cancelled_by: 'DRIVER',
             },
           }),
         ]);
-        totalBooked = bookedCount;
-        totalCancelled = cancelledCount;
+
+        if (customerCancelledCount > 0) {
+          // Smoothed completion reliability formula: (completed + 2) / (completed + driverCancelled + 2) * 100
+          meritScore = Math.max(
+            10,
+            Math.min(
+              100,
+              Math.round(
+                ((completedCount + 2) /
+                  (completedCount + customerCancelledCount + 2)) *
+                  100,
+              ),
+            ),
+          );
+        } else {
+          meritScore = 100;
+        }
       }
 
       // Only the vehicle data a garage actually needs for the job.
@@ -943,8 +967,7 @@ export class BookingService {
                 avatar: booking.customer.avatar
                   ? SojebStorage.url(booking.customer.avatar)
                   : null,
-                total_booked: totalBooked,
-                total_cancelled: totalCancelled,
+                merit_score: meritScore,
               }
             : null,
         },
@@ -955,6 +978,7 @@ export class BookingService {
       message: 'Booking fetched successfully',
       data: {
         ...baseBooking,
+        garage_note: undefined, // Internal private note for garage operator
         garage: booking.garage
           ? {
               ...booking.garage,
@@ -979,10 +1003,6 @@ export class BookingService {
 
     if (!user) {
       throw new NotFoundException('User not found');
-    }
-
-    if (user.kind !== UserKind.GARAGE) {
-      throw new ForbiddenException('Only garage users can reschedule bookings');
     }
 
     const booking = await this.prisma.booking.findUnique({
@@ -1432,4 +1452,68 @@ export class BookingService {
       data: updatedBooking,
     });
   }
+
+  async updateNote(
+    user_id: string,
+    booking_id: string,
+    dto: UpdateBookingNoteDto,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: user_id },
+      select: { id: true, kind: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.kind !== UserKind.GARAGE) {
+      throw new ForbiddenException('Only garage operators can update booking notes');
+    }
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: booking_id },
+      select: {
+        id: true,
+        garage: {
+          select: {
+            owner_id: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.garage?.owner_id !== user_id) {
+      throw new ForbiddenException('You do not have access to this booking');
+    }
+
+    const noteContent =
+      dto.garage_note !== undefined
+        ? dto.garage_note
+        : dto.note !== undefined
+          ? dto.note
+          : '';
+
+    const updated = await this.prisma.booking.update({
+      where: { id: booking_id },
+      data: {
+        garage_note: noteContent,
+      },
+      select: {
+        id: true,
+        garage_note: true,
+        updated_at: true,
+      },
+    });
+
+    return ResponseHelper.success({
+      message: 'Booking note updated successfully',
+      data: updated,
+    });
+  }
 }
+

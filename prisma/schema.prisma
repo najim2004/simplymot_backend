@@ -802,6 +802,7 @@ model Booking {
   customer_id         String?
   slot_id             String?       @unique
   additional_services String? // Free-text note from driver
+  garage_note         String? // Private note for garage operator
   status              BookingStatus @default(BOOKED)
 
   vehicle_id    String?

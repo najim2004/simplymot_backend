@@ -15,6 +15,7 @@ import { QueryBookingDto } from './dto/query-booking.dto';
 import {
   CancelBookingDto,
   RescheduleBookingDto,
+  UpdateBookingNoteDto,
 } from './dto/update-booking.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -70,7 +71,7 @@ export class BookingController {
   @apiTypedDoc(
     {
       summary: 'Reschedule booking',
-      description: 'GARAGE + JWT only. New `slot_id` or time range.',
+      description: 'Driver or garage + JWT. New `slot_id` or time range.',
     },
     { type: RescheduleBookingResponseDto },
   )
@@ -84,6 +85,26 @@ export class BookingController {
       user_id,
       booking_id,
       rescheduleBookingDto,
+    );
+  }
+
+  @apiTypedDoc(
+    {
+      summary: 'Update booking note',
+      description: 'GARAGE + JWT only. Private note for garage operator.',
+    },
+    { type: Object },
+  )
+  @Patch(':booking_id/note')
+  updateNote(
+    @Param('booking_id') booking_id: string,
+    @Body() updateBookingNoteDto: UpdateBookingNoteDto,
+    @User('id') user_id: string,
+  ) {
+    return this.bookingService.updateNote(
+      user_id,
+      booking_id,
+      updateBookingNoteDto,
     );
   }
 
@@ -118,3 +139,4 @@ export class BookingController {
     return this.bookingService.findOne(user_id, booking_id);
   }
 }
+

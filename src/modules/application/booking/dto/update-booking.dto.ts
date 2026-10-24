@@ -101,3 +101,22 @@ export class RescheduleBookingDto {
   @IsString()
   reason?: string;
 }
+
+export class UpdateBookingNoteDto {
+  @ApiPropertyOptional({
+    description: 'Internal private note for the garage',
+    example: 'Customer requested quick turnaround on brake check',
+  })
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @ApiPropertyOptional({
+    description: 'Alias for note',
+    example: 'Customer requested quick turnaround on brake check',
+  })
+  @IsOptional()
+  @IsString()
+  garage_note?: string;
+}
+
