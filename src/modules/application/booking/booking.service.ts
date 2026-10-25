@@ -36,22 +36,28 @@ export class BookingService {
     private readonly vehicleRepository: VehicleRepository,
   ) {}
 
-  /**
-   * Generates a human-readable, memorable booking number (e.g. SM-000123).
-   * The sequence is derived from the total booking count at creation time.
-   * On the rare collision (concurrent inserts), it retries with the next
-   * sequence number until a free number is found.
-   */
   private async generateBookingNumber(
     tx: Prisma.TransactionClient,
   ): Promise<string> {
     const PREFIX = 'SM';
-    const total = await tx.booking.count();
-    let sequence = total + 1;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
 
-    // Max 10 attempts to keep it safe against concurrent booking creation.
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const candidate = `${PREFIX}-${String(sequence).padStart(6, '0')}`;
+    const prefixWithDate = `${PREFIX}-${dateStr}-`;
+    const countToday = await tx.booking.count({
+      where: {
+        booking_number: {
+          startsWith: prefixWithDate,
+        },
+      },
+    });
+
+    let sequence = countToday + 1;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const candidate = `${prefixWithDate}${String(sequence).padStart(4, '0')}`;
       const exists = await tx.booking.findUnique({
         where: { booking_number: candidate },
         select: { id: true },
@@ -64,8 +70,7 @@ export class BookingService {
       sequence += 1;
     }
 
-    // Extremely unlikely fallback: still guarantee uniqueness.
-    return `${PREFIX}-${Date.now().toString().slice(-6)}`;
+    return `${prefixWithDate}${String(Date.now()).slice(-4)}`;
   }
 
   async create(createBookingDto: CreateBookingDto, user_id: string) {
@@ -565,7 +570,11 @@ export class BookingService {
         { customer: { name: { contains: term, mode: 'insensitive' } } },
         { customer: { email: { contains: term, mode: 'insensitive' } } },
         { customer: { phone_number: { contains: term, mode: 'insensitive' } } },
-        { vehicle: { registration_number: { contains: term, mode: 'insensitive' } } },
+        {
+          vehicle: {
+            registration_number: { contains: term, mode: 'insensitive' },
+          },
+        },
         { vehicle: { make: { contains: term, mode: 'insensitive' } } },
         { vehicle: { model: { contains: term, mode: 'insensitive' } } },
         { garage: { garage_name: { contains: term, mode: 'insensitive' } } },
@@ -588,12 +597,6 @@ export class BookingService {
               ends_at: true,
             },
           },
-          items: {
-            take: 1,
-            select: {
-              unit_price: true,
-            },
-          },
           vehicle: {
             select: {
               registration_number: true,
@@ -609,6 +612,7 @@ export class BookingService {
               contact_email: true,
               phone_number: true,
               address: true,
+              post_code: true,
               garage_image: true,
             },
           },
@@ -636,9 +640,6 @@ export class BookingService {
       status: booking.status,
       starts_at: booking.slot?.starts_at ?? booking.order_date,
       ends_at: booking.slot?.ends_at ?? null,
-      // Garages don't handle payments for these bookings, so they
-      // never receive price details.
-      service_price: isGarage ? null : (booking.items[0]?.unit_price ?? null),
       customer: booking.customer
         ? {
             name: booking.customer.name,
@@ -650,18 +651,21 @@ export class BookingService {
           }
         : null,
       garage_id: booking.garage_id,
-      garage: booking.garage
-        ? {
-            id: booking.garage.id,
-            name: booking.garage.garage_name,
-            email: booking.garage.contact_email,
-            phone_number: booking.garage.phone_number,
-            address: booking.garage.address,
-            image: booking.garage.garage_image
-              ? SojebStorage.url(booking.garage.garage_image)
-              : null,
-          }
-        : null,
+      garage: isGarage
+        ? null
+        : booking.garage
+          ? {
+              id: booking.garage.id,
+              name: booking.garage.garage_name,
+              email: booking.garage.contact_email,
+              phone_number: booking.garage.phone_number,
+              address: booking.garage.address,
+              post_code: booking.garage.post_code,
+              garage_image: booking.garage.garage_image
+                ? SojebStorage.url(booking.garage.garage_image)
+                : null,
+            }
+          : null,
       vehicle: booking.vehicle
         ? {
             registration_number: booking.vehicle.registration_number,
@@ -705,14 +709,12 @@ export class BookingService {
         id: true,
         booking_number: true,
         created_at: true,
-        updated_at: true,
         order_date: true,
         status: true,
         garage_id: true,
         customer_id: true,
         vehicle_id: true,
         slot_id: true,
-        total_amount: true,
         additional_services: true,
         garage_note: true,
         cancel_reason: true,
@@ -722,8 +724,6 @@ export class BookingService {
             id: true,
             starts_at: true,
             ends_at: true,
-            status: true,
-            description: true,
           },
         },
         vehicle: {
@@ -759,10 +759,6 @@ export class BookingService {
             garage_image: true,
             contact_email: true,
             phone_number: true,
-            vts_number: true,
-            country: true,
-            state: true,
-            city: true,
             address: true,
             post_code: true,
           },
@@ -774,26 +770,6 @@ export class BookingService {
             email: true,
             phone_number: true,
             avatar: true,
-            country: true,
-            state: true,
-            city: true,
-            address: true,
-            post_code: true,
-          },
-        },
-        items: {
-          select: {
-            id: true,
-            quantity: true,
-            unit_price: true,
-            service: {
-              select: {
-                id: true,
-                title: true,
-                type: true,
-                price: true,
-              },
-            },
           },
         },
       },
@@ -819,17 +795,6 @@ export class BookingService {
     } else if (booking.customer_id !== user.id) {
       throw new ForbiddenException('You do not have access to this booking');
     }
-
-    const lastMot = booking.vehicle?.mot_history?.[0] ?? null;
-    const vehicle = booking.vehicle
-      ? {
-          ...booking.vehicle,
-          mot_history: undefined,
-          last_mot_test_date: lastMot?.test_date ?? null,
-          last_mot_expiry_date: lastMot?.expiry_date ?? null,
-          last_mot_status: lastMot?.status ?? null,
-        }
-      : null;
 
     const auditLogs = await this.prisma.auditLog.findMany({
       where: {
@@ -871,29 +836,55 @@ export class BookingService {
       id: booking.id,
       booking_number: booking.booking_number,
       created_at: booking.created_at,
-      updated_at: booking.updated_at,
       order_date: booking.order_date,
       starts_at: booking.slot?.starts_at ?? null,
       ends_at: booking.slot?.ends_at ?? null,
       status: booking.status,
       garage_id: booking.garage_id,
       customer_id: booking.customer_id,
-      vehicle_id: booking.vehicle_id,
       slot_id: booking.slot_id,
-      total_amount: booking.total_amount,
+      vehicle_id: booking.vehicle_id,
       additional_services: booking.additional_services,
       garage_note: booking.garage_note,
       cancel_reason: booking.cancel_reason,
       cancelled_by: booking.cancelled_by,
-      slot: booking.slot,
-      vehicle,
-      items: booking.items,
       logs,
     };
 
+    const garageData = booking.garage
+      ? {
+          id: booking.garage.id,
+          name: booking.garage.garage_name,
+          email: booking.garage.contact_email,
+          phone_number: booking.garage.phone_number,
+          address: booking.garage.address,
+          post_code: booking.garage.post_code,
+          garage_image: booking.garage.garage_image
+            ? SojebStorage.url(booking.garage.garage_image)
+            : null,
+        }
+      : null;
+
+    const vehicle = booking.vehicle
+      ? {
+          registration_number: booking.vehicle.registration_number,
+          make: booking.vehicle.make,
+          model: booking.vehicle.model,
+          color: booking.vehicle.color,
+          fuel_type: booking.vehicle.fuel_type,
+          engine_capacity: booking.vehicle.engine_capacity,
+          year_of_manufacture: booking.vehicle.year_of_manufacture,
+          mot_status: booking.vehicle.mot_status,
+          mot_expiry_date: booking.vehicle.mot_expiry_date,
+          last_mot_test_date:
+            booking.vehicle?.mot_history?.[0]?.test_date ?? null,
+          last_mot_expiry_date:
+            booking.vehicle?.mot_history?.[0]?.expiry_date ?? null,
+          last_mot_status: booking.vehicle?.mot_history?.[0]?.status ?? null,
+        }
+      : null;
+
     if (user.kind === UserKind.GARAGE) {
-      // Customer Merit Score (0 - 100)
-      // Garage cancellations must NEVER reduce customer's merit score!
       let meritScore = 100;
 
       if (booking.customer_id) {
@@ -908,15 +899,12 @@ export class BookingService {
             where: {
               customer_id: booking.customer_id,
               status: BookingStatus.CANCELLED,
-              // Only cancellations where cancelled_by is DRIVER count against customer.
-              // Cancellations by GARAGE are excluded so customer merit is never lowered by garage action.
               cancelled_by: 'DRIVER',
             },
           }),
         ]);
 
         if (customerCancelledCount > 0) {
-          // Smoothed completion reliability formula: (completed + 2) / (completed + driverCancelled + 2) * 100
           meritScore = Math.max(
             10,
             Math.min(
@@ -933,33 +921,14 @@ export class BookingService {
         }
       }
 
-      // Only the vehicle data a garage actually needs for the job.
-      const garageVehicle = booking.vehicle
-        ? {
-            registration_number: booking.vehicle.registration_number,
-            make: booking.vehicle.make,
-            model: booking.vehicle.model,
-            color: booking.vehicle.color,
-            fuel_type: booking.vehicle.fuel_type,
-            engine_capacity: booking.vehicle.engine_capacity,
-            year_of_manufacture: booking.vehicle.year_of_manufacture,
-            mot_status: booking.vehicle.mot_status,
-            mot_expiry_date: booking.vehicle.mot_expiry_date,
-            last_mot_test_date: lastMot?.test_date ?? null,
-            last_mot_expiry_date: lastMot?.expiry_date ?? null,
-            last_mot_status: lastMot?.status ?? null,
-          }
-        : null;
-
       return ResponseHelper.success({
         message: 'Booking fetched successfully',
         data: {
           ...baseBooking,
-          // Garages don't handle payments here, and shouldn't see
-          // price details or the customer's home address.
           total_amount: undefined,
           items: undefined,
-          vehicle: garageVehicle,
+          vehicle,
+          garage: garageData,
           customer: booking.customer
             ? {
                 id: booking.customer.id,
@@ -980,15 +949,10 @@ export class BookingService {
       message: 'Booking fetched successfully',
       data: {
         ...baseBooking,
-        garage_note: undefined, // Internal private note for garage operator
-        garage: booking.garage
-          ? {
-              ...booking.garage,
-              garage_image: booking.garage.garage_image
-                ? SojebStorage.url(booking.garage.garage_image)
-                : null,
-            }
-          : null,
+        garage_note: undefined,
+        customer: undefined,
+        garage: garageData,
+        vehicle,
       },
     });
   }
@@ -1470,7 +1434,9 @@ export class BookingService {
     }
 
     if (user.kind !== UserKind.GARAGE) {
-      throw new ForbiddenException('Only garage operators can update booking notes');
+      throw new ForbiddenException(
+        'Only garage operators can update booking notes',
+      );
     }
 
     const booking = await this.prisma.booking.findUnique({
@@ -1518,4 +1484,3 @@ export class BookingService {
     });
   }
 }
-
