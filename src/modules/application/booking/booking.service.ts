@@ -873,6 +873,8 @@ export class BookingService {
       created_at: booking.created_at,
       updated_at: booking.updated_at,
       order_date: booking.order_date,
+      starts_at: booking.slot?.starts_at ?? null,
+      ends_at: booking.slot?.ends_at ?? null,
       status: booking.status,
       garage_id: booking.garage_id,
       customer_id: booking.customer_id,
