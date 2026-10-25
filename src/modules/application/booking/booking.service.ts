@@ -638,7 +638,7 @@ export class BookingService {
       id: booking.id,
       booking_number: booking.booking_number,
       status: booking.status,
-      starts_at: booking.slot?.starts_at ?? booking.order_date,
+      starts_at: booking.slot?.starts_at ?? null,
       ends_at: booking.slot?.ends_at ?? null,
       customer: booking.customer
         ? {

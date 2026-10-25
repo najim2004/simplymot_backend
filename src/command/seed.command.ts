@@ -182,7 +182,7 @@ export class SeedCommand extends CommandRunner {
       projectManagerPermissionRoleArray.push({
         role_id: '3',
         permission_id: project_manager_permission.id,
-        });
+      });
     }
     await this.prisma.permissionRole.createMany({
       data: projectManagerPermissionRoleArray,

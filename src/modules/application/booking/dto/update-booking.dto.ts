@@ -119,4 +119,3 @@ export class UpdateBookingNoteDto {
   @IsString()
   garage_note?: string;
 }
-

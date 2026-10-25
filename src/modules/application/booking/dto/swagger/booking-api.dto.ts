@@ -48,7 +48,6 @@ export class BookingCreatedDto {
   vehicle: BookingCreatedVehicleDto | null;
 }
 
-
 export class BookingListCustomerDto {
   @ApiPropertyOptional({ nullable: true })
   name: string | null;

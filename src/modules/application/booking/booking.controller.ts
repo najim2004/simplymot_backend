@@ -139,4 +139,3 @@ export class BookingController {
     return this.bookingService.findOne(user_id, booking_id);
   }
 }
-
