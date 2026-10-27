@@ -29,8 +29,11 @@ export class SubscriptionPlanDto {
   @ApiProperty()
   is_checkout_ready: boolean;
 
-  @ApiPropertyOptional({ nullable: true })
-  current_subscription: Record<string, unknown> | null;
+  @ApiPropertyOptional({ example: false })
+  is_current_plan?: boolean;
+
+  @ApiPropertyOptional({ example: false })
+  has_subscription?: boolean;
 }
 
 export class SubscriptionPlanBillingDto {
@@ -219,4 +222,29 @@ export class ValidateCheckoutSessionResponseDto {
 
   @ApiProperty({ type: SubscriptionCheckoutSuccessDataDto })
   data: SubscriptionCheckoutSuccessDataDto;
+}
+
+export class PlanDetailsDataDto {
+  @ApiProperty({ type: SubscriptionPlanDto })
+  plan: SubscriptionPlanDto;
+
+  @ApiPropertyOptional({ nullable: true })
+  subscription: Record<string, unknown> | null;
+
+  @ApiProperty({ example: true })
+  is_current_plan: boolean;
+
+  @ApiProperty({ example: true })
+  has_subscription: boolean;
+}
+
+export class GetSubscriptionPlanDetailsResponseDto {
+  @ApiProperty({ example: true })
+  success: boolean;
+
+  @ApiProperty({ example: 'Subscription plan details fetched successfully' })
+  message: string;
+
+  @ApiProperty({ type: PlanDetailsDataDto })
+  data: PlanDetailsDataDto;
 }

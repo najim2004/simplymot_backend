@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Patch,
   Put,
   Query,
@@ -17,6 +18,7 @@ import { CancelSubscriptionDto } from './dto/update-subscription.dto';
 import { apiTypedDoc } from 'src/common/swagger/api-doc';
 import {
   CancelSubscriptionResponseDto,
+  GetSubscriptionPlanDetailsResponseDto,
   ListSubscriptionPlansResponseDto,
   SubscribeResponseDto,
   SubscriptionStatusResponseDto,
@@ -34,7 +36,7 @@ export class SubscriptionController {
     {
       summary: 'List active plans',
       description:
-        'GARAGE + JWT. Each plan may include `current_subscription`.',
+        'GARAGE + JWT. Returns active plans with is_current_plan and has_subscription.',
     },
     { type: ListSubscriptionPlansResponseDto },
   )
@@ -44,6 +46,24 @@ export class SubscriptionController {
     @User('id') user_id: string,
   ) {
     return this.subscriptionService.getActivePlans(user_id, query);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @apiTypedDoc(
+    {
+      summary: 'Get subscription plan details',
+      description:
+        'GARAGE + JWT. Returns plan details and current user subscription details.',
+    },
+    { type: GetSubscriptionPlanDetailsResponseDto },
+  )
+  @Get('plans/:plan_id')
+  getPlanDetails(
+    @Param('plan_id') plan_id: string,
+    @User('id') user_id: string,
+  ) {
+    return this.subscriptionService.getPlanDetails(user_id, plan_id);
   }
 
   @ApiBearerAuth()

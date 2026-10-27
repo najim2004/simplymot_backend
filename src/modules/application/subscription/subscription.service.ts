@@ -62,9 +62,31 @@ export class SubscriptionService {
 
     const userSubscription = await this.prisma.subscription.findFirst({
       where: { user_id },
-      include: this.subscriptionInclude(),
+      select: {
+        plan_id: true,
+        status: true,
+        current_period_end: true,
+        cancel_at_period_end: true,
+      },
       orderBy: { created_at: 'desc' },
     });
+
+    const now = Date.now();
+    const periodEnd = userSubscription?.current_period_end
+      ? new Date(userSubscription.current_period_end).getTime()
+      : null;
+    const hasPeriodAccess = periodEnd ? periodEnd > now : false;
+    const activeStatuses: SubscriptionStatus[] = [
+      SubscriptionStatus.TRIALING,
+      SubscriptionStatus.ACTIVE,
+    ];
+    const userHasAccess = Boolean(
+      userSubscription &&
+        (activeStatuses.includes(userSubscription.status) ||
+          (userSubscription.status === SubscriptionStatus.CANCELLED &&
+            hasPeriodAccess) ||
+          userSubscription.status === SubscriptionStatus.PAST_DUE),
+    );
 
     const [plans, total] = await Promise.all([
       this.prisma.subscriptionPlan.findMany({
@@ -88,25 +110,102 @@ export class SubscriptionService {
 
     return ResponseHelper.success({
       message: 'Subscription plans fetched successfully',
-      data: plans.map((plan) => ({
-        id: plan.id,
-        name: plan.name,
-        description: plan.description,
-        price_pence: plan.price_pence,
-        currency: plan.currency,
-        price_formatted: this.formatPrice(plan.price_pence, plan.currency),
-        period_type: plan.period_type,
-        trial_period_days: plan.trial_period_days,
-        is_checkout_ready: Boolean(plan.stripe_price_id),
-        current_subscription:
-          userSubscription && userSubscription.plan_id === plan.id
-            ? this.formatSubscription(userSubscription)
-            : null,
-      })),
+      data: plans.map((plan) => {
+        const isCurrentPlan = Boolean(
+          userSubscription && userSubscription.plan_id === plan.id,
+        );
+        return {
+          id: plan.id,
+          name: plan.name,
+          description: plan.description,
+          price_pence: plan.price_pence,
+          currency: plan.currency,
+          price_formatted: this.formatPrice(plan.price_pence, plan.currency),
+          period_type: plan.period_type,
+          trial_period_days: plan.trial_period_days,
+          is_checkout_ready: Boolean(plan.stripe_price_id),
+          is_current_plan: isCurrentPlan,
+          has_subscription: Boolean(isCurrentPlan && userHasAccess),
+        };
+      }),
       meta_data: {
         page,
         limit,
         total,
+      },
+    });
+  }
+
+  async getPlanDetails(user_id: string, plan_id: string) {
+    await this.ensureGarageUser(user_id);
+
+    let targetPlanId = plan_id;
+
+    if (plan_id === 'current') {
+      const activeSub = await this.prisma.subscription.findFirst({
+        where: { user_id },
+        orderBy: { created_at: 'desc' },
+        select: { plan_id: true },
+      });
+      if (activeSub?.plan_id) {
+        targetPlanId = activeSub.plan_id;
+      }
+    }
+
+    const plan = await this.prisma.subscriptionPlan.findUnique({
+      where: { id: targetPlanId },
+    });
+
+    if (!plan) {
+      throw new NotFoundException('Subscription plan not found');
+    }
+
+    let userSubscription = await this.prisma.subscription.findFirst({
+      where: {
+        user_id,
+        plan_id: plan.id,
+      },
+      include: this.subscriptionInclude(),
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (!userSubscription) {
+      userSubscription = await this.prisma.subscription.findFirst({
+        where: { user_id },
+        include: this.subscriptionInclude(),
+        orderBy: { created_at: 'desc' },
+      });
+    }
+
+    const formattedSubscription = userSubscription
+      ? this.formatSubscription(userSubscription)
+      : null;
+
+    const statusDetails = userSubscription
+      ? this.getStatusDetails(userSubscription)
+      : null;
+
+    const isCurrentPlan = Boolean(
+      userSubscription && userSubscription.plan_id === plan.id,
+    );
+
+    return ResponseHelper.success({
+      message: 'Subscription plan details fetched successfully',
+      data: {
+        plan: {
+          id: plan.id,
+          name: plan.name,
+          description: plan.description,
+          price_pence: plan.price_pence,
+          currency: plan.currency,
+          price_formatted: this.formatPrice(plan.price_pence, plan.currency),
+          period_type: plan.period_type,
+          trial_period_days: plan.trial_period_days,
+          is_checkout_ready: Boolean(plan.stripe_price_id),
+        },
+        subscription: formattedSubscription,
+        is_current_plan: isCurrentPlan,
+        has_subscription: Boolean(isCurrentPlan && statusDetails?.has_access),
       },
     });
   }
