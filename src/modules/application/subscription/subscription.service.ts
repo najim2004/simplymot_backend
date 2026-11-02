@@ -19,6 +19,7 @@ import {
 import { Prisma } from '@generated/prisma';
 import type Stripe from 'stripe';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
+import { ValidatePromoCodeDto } from './dto/validate-promo-code.dto';
 import { QuerySubscriptionDto } from './dto/query-subscription.dto';
 import { CancelSubscriptionDto } from './dto/update-subscription.dto';
 import { PromoCodeRepository } from 'src/common/repository/promo-code/promo-code.repository';
@@ -371,6 +372,49 @@ export class SubscriptionService {
 
       throw error;
     }
+  }
+
+  async validatePromoCode(dto: ValidatePromoCodeDto) {
+    const plan = await this.prisma.subscriptionPlan.findFirst({
+      where: {
+        id: dto.plan_id,
+        status: SubscriptionPlanStatus.ACTIVE,
+      },
+    });
+
+    if (!plan) {
+      throw new NotFoundException('Subscription plan not found');
+    }
+
+    const promoCode = await this.promoCodeRepository.validateForRedemption(
+      dto.code,
+    );
+
+    if (!promoCode) {
+      throw new BadRequestException('Invalid promo code');
+    }
+
+    const percentOff = promoCode.percent_off;
+    const discountPence = Math.min(
+      plan.price_pence,
+      Math.round((plan.price_pence * percentOff) / 100),
+    );
+    const finalPricePence = Math.max(0, plan.price_pence - discountPence);
+
+    return ResponseHelper.success({
+      message: 'Promo code applied successfully',
+      data: {
+        valid: true,
+        code: promoCode.code,
+        name: promoCode.name,
+        percent_off: percentOff,
+        discount_pence: discountPence,
+        discount_formatted: this.formatPrice(discountPence, plan.currency),
+        final_price_pence: finalPricePence,
+        final_price_formatted: this.formatPrice(finalPricePence, plan.currency),
+        duration: promoCode.duration,
+      },
+    });
   }
 
   async createBillingPortalSession(user_id: string) {

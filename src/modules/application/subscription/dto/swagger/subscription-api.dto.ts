@@ -248,3 +248,43 @@ export class GetSubscriptionPlanDetailsResponseDto {
   @ApiProperty({ type: PlanDetailsDataDto })
   data: PlanDetailsDataDto;
 }
+
+export class ValidatePromoCodeDataDto {
+  @ApiProperty({ example: true })
+  valid: boolean;
+
+  @ApiProperty({ example: 'SAVE50' })
+  code: string;
+
+  @ApiPropertyOptional({ example: 'Summer Special' })
+  name?: string;
+
+  @ApiProperty({ example: 50 })
+  percent_off: number;
+
+  @ApiProperty({ example: 250 })
+  discount_pence: number;
+
+  @ApiProperty({ example: '£2.50' })
+  discount_formatted: string;
+
+  @ApiProperty({ example: 250 })
+  final_price_pence: number;
+
+  @ApiProperty({ example: '£2.50' })
+  final_price_formatted: string;
+
+  @ApiPropertyOptional({ example: 'ONCE' })
+  duration?: string;
+}
+
+export class ValidatePromoCodeResponseDto {
+  @ApiProperty({ example: true })
+  success: boolean;
+
+  @ApiProperty({ example: 'Promo code applied successfully' })
+  message: string;
+
+  @ApiProperty({ type: ValidatePromoCodeDataDto })
+  data: ValidatePromoCodeDataDto;
+}

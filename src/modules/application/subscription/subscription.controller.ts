@@ -2,8 +2,10 @@ import {
   Body,
   Controller,
   Get,
+  HttpStatus,
   Param,
   Patch,
+  Post,
   Put,
   Query,
   UseGuards,
@@ -13,6 +15,7 @@ import { User } from 'src/modules/auth/decorators/get-user.decorator';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { SubscriptionService } from './subscription.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
+import { ValidatePromoCodeDto } from './dto/validate-promo-code.dto';
 import { QuerySubscriptionDto } from './dto/query-subscription.dto';
 import { CancelSubscriptionDto } from './dto/update-subscription.dto';
 import { apiTypedDoc } from 'src/common/swagger/api-doc';
@@ -23,6 +26,7 @@ import {
   SubscribeResponseDto,
   SubscriptionStatusResponseDto,
   ValidateCheckoutSessionResponseDto,
+  ValidatePromoCodeResponseDto,
 } from './dto/swagger/subscription-api.dto';
 
 @ApiTags('Subscription')
@@ -82,6 +86,21 @@ export class SubscriptionController {
     @User('id') user_id: string,
   ) {
     return this.subscriptionService.subscribe(user_id, createSubscriptionDto);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @apiTypedDoc(
+    {
+      summary: 'Validate promo code for plan',
+      description:
+        'GARAGE + JWT. Validates promo code against database and Stripe, and returns discount breakdown.',
+    },
+    { type: ValidatePromoCodeResponseDto, status: HttpStatus.OK },
+  )
+  @Post('validate-promo')
+  validatePromoCode(@Body() dto: ValidatePromoCodeDto) {
+    return this.subscriptionService.validatePromoCode(dto);
   }
 
   @ApiBearerAuth()
