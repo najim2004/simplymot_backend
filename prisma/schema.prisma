@@ -252,6 +252,8 @@ model Garage {
   latitude  Float?
   longitude Float?
 
+  is_visible Boolean @default(true)
+
   owner     User       @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   services  Service[]
   schedule  Schedule?

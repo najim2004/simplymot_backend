@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { GarageService } from './garage.service';
 import { QueryGarageDto } from './dto/query-garage.dto';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -42,5 +50,13 @@ export class GarageController {
   @Get(':garage_id')
   getGarageDetails(@Param('garage_id') garage_id: string) {
     return this.garageService.getGarageDetails(garage_id);
+  }
+
+  @Patch(':garage_id/visibility')
+  toggleGarageVisibility(
+    @Param('garage_id') garage_id: string,
+    @Body('is_visible') is_visible?: boolean,
+  ) {
+    return this.garageService.toggleGarageVisibility(garage_id, is_visible);
   }
 }

@@ -51,7 +51,6 @@ export class QueryGarageDto {
     description: 'Search',
     example: 'John Doe',
   })
-  @IsEnum(UserAccountStatus)
   @IsString()
   search?: string;
 
@@ -63,4 +62,12 @@ export class QueryGarageDto {
   })
   @IsEnum(UserAccountStatus)
   status?: UserAccountStatus;
+
+  @IsOptional()
+  @ApiProperty({
+    description: 'Visibility: true for visible, false for hidden',
+    example: true,
+  })
+  @Type(() => Boolean)
+  is_visible?: boolean;
 }
