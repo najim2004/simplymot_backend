@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 import { CreateSubscriptionPlanDto } from './dto/create-subscription.dto';
-import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
+import { UpdateSubscriptionPlanDto } from './dto/update-subscription.dto';
 import { QuerySubscriptionPlanDto } from './dto/query-subscription.dto';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -99,11 +99,11 @@ export class SubscriptionController {
   @Patch('plan/:plan_id')
   updateSubscriptionPlan(
     @Param('plan_id') plan_id: string,
-    @Body() updateSubscriptionDto: UpdateSubscriptionDto,
+    @Body() updateSubscriptionPlanDto: UpdateSubscriptionPlanDto,
   ) {
     return this.subscriptionService.updateSubscriptionPlan(
       plan_id,
-      updateSubscriptionDto,
+      updateSubscriptionPlanDto,
     );
   }
 

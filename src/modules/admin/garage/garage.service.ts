@@ -10,7 +10,7 @@ export class GarageService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAllGarages(query: QueryGarageDto) {
-    const { page, limit, search, status, from_date, to_date } = query;
+    const { page, limit = 10, search, status, from_date, to_date } = query;
     const whereClause: Prisma.GarageWhereInput = {
       ...(search && { garage_name: { contains: search, mode: 'insensitive' } }),
       ...(search && { email: { contains: search, mode: 'insensitive' } }),
