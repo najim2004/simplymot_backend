@@ -45,6 +45,16 @@ export class QueryBookingDto {
   to_date?: Date;
 
   @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  startdate?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  enddate?: Date;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @ApiProperty({

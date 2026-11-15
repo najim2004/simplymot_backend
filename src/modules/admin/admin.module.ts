@@ -8,6 +8,7 @@ import { GarageModule } from './garage/garage.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { RoleModule } from './role/role.module';
 import { PromoCodeModule } from './promo-code/promo-code.module';
+import { DriverModule } from './driver/driver.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { PromoCodeModule } from './promo-code/promo-code.module';
     ContactModule,
     TransactionModule,
     UserModule,
+    DriverModule,
     VehicleModule,
     BookingModule,
     GarageModule,
