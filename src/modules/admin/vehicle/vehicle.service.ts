@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import {
@@ -34,7 +34,7 @@ export class VehicleService {
     const now = new Date();
 
     const params: any[] = [];
-    const filters: string[] = ['u."type" = $1', 'u."deleted_at" IS NULL'];
+    const filters: string[] = ['u."kind" = $1', 'u."deleted_at" IS NULL'];
     params.push('DRIVER');
 
     const nextParam = (value: any) => {
@@ -52,7 +52,7 @@ export class VehicleService {
         `u."city" ILIKE ${likeParam}`,
         `u."state" ILIKE ${likeParam}`,
         `u."country" ILIKE ${likeParam}`,
-        `u."zip_code" ILIKE ${likeParam}`,
+        `u."post_code" ILIKE ${likeParam}`,
         `v."registration_number" ILIKE ${likeParam}`,
         `v."make" ILIKE ${likeParam}`,
         `v."model" ILIKE ${likeParam}`,
@@ -123,15 +123,25 @@ export class VehicleService {
       SELECT
         v."id",
         v."registration_number",
+        v."make",
+        v."model",
+        v."color",
         v."mot_expiry_date",
+        v."mot_status",
         v."is_expired",
+        v."tax_status",
+        v."tax_due_date",
+        v."created_at",
+        v."mot_last_checked_at",
         u."id" AS "user_id",
         u."name" AS "user_name",
         u."email" AS "user_email",
         u."phone_number" AS "user_phone_number",
+        u."avatar" AS "user_avatar",
+        u."status" AS "user_status",
         COUNT(*) OVER()::int AS "total_count"
       FROM "Vehicle" v
-      JOIN "User" u ON u."id" = v."user_id"
+      JOIN "users" u ON u."id" = v."user_id"
       WHERE ${filters.join(' AND ')}
       ORDER BY ${orderByClause}
       LIMIT ${limitParam}
@@ -142,11 +152,22 @@ export class VehicleService {
       Array<{
         id: string;
         registration_number: string;
+        make: string | null;
+        model: string | null;
+        color: string | null;
         mot_expiry_date: Date | null;
+        mot_status: string | null;
+        is_expired: boolean;
+        tax_status: string | null;
+        tax_due_date: Date | null;
+        created_at: Date;
+        mot_last_checked_at: Date | null;
         user_id: string | null;
         user_name: string | null;
         user_email: string | null;
         user_phone_number: string | null;
+        user_avatar: string | null;
+        user_status: string | null;
         total_count: number;
       }>
     >(query, ...params);
@@ -155,11 +176,22 @@ export class VehicleService {
     const vehicles = rows.map((row) => ({
       id: row.id,
       registration_number: row.registration_number,
+      make: row.make,
+      model: row.model,
+      color: row.color,
       mot_expiry_date: row.mot_expiry_date,
+      mot_status: row.mot_status,
+      is_expired: row.is_expired,
+      tax_status: row.tax_status,
+      tax_due_date: row.tax_due_date,
+      created_at: row.created_at,
+      mot_last_checked_at: row.mot_last_checked_at,
       vehicle_owner_id: row.user_id,
       vehicle_owner_name: row.user_name,
       vehicle_owner_email: row.user_email,
       vehicle_owner_phone_number: row.user_phone_number,
+      vehicle_owner_avatar: row.user_avatar,
+      vehicle_owner_status: row.user_status,
     }));
 
     return ResponseHelper.success({
@@ -186,6 +218,8 @@ export class VehicleService {
       },
       select: {
         id: true,
+        created_at: true,
+        updated_at: true,
         registration_number: true,
         mot_expiry_date: true,
         is_expired: true,
@@ -197,10 +231,13 @@ export class VehicleService {
         co2_emissions: true,
         mot_status: true,
         year_of_manufacture: true,
+        month_of_first_reg: true,
+        wheelplan: true,
+        tax_status: true,
+        tax_due_date: true,
+        date_of_last_v5c_issued: true,
         mot_last_checked_at: true,
         reminder_last_sent_at: true,
-        raw_mot_data: true,
-        raw_dvla_data: true,
         raw_mot_status: true,
         user: {
           select: {
@@ -208,10 +245,15 @@ export class VehicleService {
             name: true,
             email: true,
             phone_number: true,
+            avatar: true,
+            status: true,
           },
         },
       },
     });
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
     const { user, ...rest } = vehicle;
     return ResponseHelper.success({
       data: {
@@ -225,9 +267,13 @@ export class VehicleService {
     vehicle_id: string,
     queryVehicleHistoryDto: QueryVehicleHistoryDto,
   ) {
-    const { page, limit, search } = queryVehicleHistoryDto;
+    const page = Math.max(1, Number(queryVehicleHistoryDto?.page) || 1);
+    const limit = Math.max(
+      1,
+      Math.min(100, Number(queryVehicleHistoryDto?.limit) || 20),
+    );
+    const search = queryVehicleHistoryDto?.search?.trim();
     const skip = (page - 1) * limit;
-    const take = limit;
     const whereClause: Prisma.MotHistoryWhereInput = {
       vehicle_id,
     };
@@ -243,16 +289,26 @@ export class VehicleService {
         test_date: 'desc',
       },
       skip,
-      take,
+      take: limit,
       select: {
         id: true,
+        test_number: true,
         test_date: true,
+        expiry_date: true,
         status: true,
         odometer_value: true,
         odometer_unit: true,
         odometer_result_type: true,
         data_source: true,
         registration_at_test: true,
+        defects: {
+          select: {
+            id: true,
+            type: true,
+            text: true,
+            dangerous: true,
+          },
+        },
       },
     });
     const total = await this.prisma.motHistory.count({
